@@ -166,16 +166,16 @@ ocp.constraints.D   = Lu
 ocp.constraints.lg  = lg
 ocp.constraints.ug  = ug
 
-# Pdelta = np.reshape(np.genfromtxt('parameter/Pdelta.txt', delimiter=','), (nx,nx))
-# Ps = np.linalg.norm(scipy.linalg.sqrtm(P)*scipy.linalg.sqrtm(scipy.linalg.inv(Pdelta)))
+Pdelta = np.reshape(np.genfromtxt(fp.joinpath('mpc_parameters','Pdelta.txt'), delimiter=','), (nx,nx))
+Ps = np.linalg.norm(scipy.linalg.sqrtm(P)*scipy.linalg.sqrtm(scipy.linalg.inv(Pdelta)))
 # print("PS")
 # print(Ps)
-# ocp.model.con_h_expr_e = ocp.model.x[:nx_].T @ P @ ocp.model.x[:nx_] + Ps*ocp.model.x[-1]
+ocp.model.con_h_expr_e = ocp.model.x[:nx].T @ P @ ocp.model.x[:nx] + Ps*ocp.model.x[-1]
 # print(type(ocp.model.con_h_expr_e))
 # print(model.con_h_expr_e.shape)
-# ocp.constraints.lh_e = np.array([-1])
+ocp.constraints.lh_e = np.array([-1])
 # ALPHA
-# ocp.constraints.uh_e = np.array([alpha_f])
+ocp.constraints.uh_e = np.array([alpha_f])
 
 # x0 = np.array([np.deg2rad(45), np.deg2rad(5), np.deg2rad(5), 0, 0, 0, 0, 0])
 ocp.constraints.x0 = np.zeros(nx_)

@@ -75,7 +75,7 @@ def generatemodel(traindata, architecture, clipped_mae=False):
     return model
 
 
-def hyperparametertuning(mpc, X, Y, datasetname, architectures):
+def hyperparametertuning(mpc, X, Y, datasetname, architectures, maxepochs=5000, patience=1000):
     print("\nperforming hyperparameter tuning\n")
     X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
     # X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.84, random_state=42)
@@ -97,13 +97,13 @@ def hyperparametertuning(mpc, X, Y, datasetname, architectures):
         model = generatemodel(X_train, a)
         model.summary()
         batch_size = 10000
-        overfitCallback = EarlyStopping(monitor='loss', min_delta=0, patience = 1000)
+        overfitCallback = EarlyStopping(monitor='loss', min_delta=0, patience = patience)
         history = model.fit(
             X_train,
             Y_train,
             verbose=2,
             batch_size=batch_size,
-            epochs=10,
+            epochs=maxepochs,
             validation_split = 0.2,
             callbacks=[overfitCallback]
             )
