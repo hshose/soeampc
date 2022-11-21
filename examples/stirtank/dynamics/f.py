@@ -1,4 +1,6 @@
-def f(x1, x2, u):
+def f(x, u):
+    x1 = x[0]
+    x2 = x[1]
     theta   = 20
     k       = 300
     M       = 5
@@ -11,4 +13,4 @@ def f(x1, x2, u):
     ue      = 0.7853
     x1_dot = (1/theta)*(1-(x1+xe1))-k*(x1+xe1)*e**(-M/(x2+xe2))
     x2_dot = (1/theta)*(xf-(x2+xe2))+k*(x1+xe1)*e**(-M/(x2+xe2)) - alpha*(u+ue)*((x2+xe2)-xc)
-    return x1_dot, x2_dot
+    return [x1_dot, x2_dot]

@@ -1,7 +1,14 @@
 from abc import ABC, abstractmethod
 import numpy as np
+from scipy.integrate import odeint
 
 __all__ = ['MPC', 'MPCQuadraticCostBoxConstr']
+
+def checkboxconstraint(series, lower, upper):
+    for s in series:
+        if not (all(s<=upper) and all(s>=lower)):
+            return False
+    return True
 
 class MPC(ABC):
     "Dimensions for OCP"
@@ -132,14 +139,15 @@ class MPC(ABC):
     def forwardsim(self,x,U):
         Ts = self.__Tf/self.__N
         t = np.linspace(0,self.__Tf,self.__N+1)
-        if self.f_type() == 'CT':
+        if self.f_type == 'CT':
             def f_pwconst_input(y,t,U,Ts):
                     x = y
-                    idx = min( int(t/Ts), len(U)-1)
-                    u = U[idx]
-                    return self.__f(x, u)
-            
+                    idx = min( int(t/Ts), np.shape(U)[0]-1)
+                    u = U[idx,:]
+                    return tuple(self.__f(x, u))
+
             X = odeint(f_pwconst_input, x, t, args=(U, Ts))
+            return X
         else:
             raise Exception('DT not implemented yet')
 
@@ -153,6 +161,7 @@ class MPCQuadraticCostBoxConstr(MPC):
         super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).nu.__set__(self,  nu )
         super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).Tf.__set__(self,  Tf )
         super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).f.__set__( self,  f  )
+        super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).f_type.__set__( self,  'CT'  )
 
         self.__P = P
         self.__alpha = alpha
@@ -165,7 +174,6 @@ class MPCQuadraticCostBoxConstr(MPC):
         self.__K = K
         self.__terminalcontroller = lambda x: K@x
 
-    
     @property
     def xmin(self):
         return self.__xmin
@@ -206,24 +214,22 @@ class MPCQuadraticCostBoxConstr(MPC):
     def K(self):
         return self.__K
 
-    def checkboxconstraint(series, lower, upper):
-        for s in series:
-            if not (all(s<=upper) and all(s>=lower)):
-                return False
-        return True
+    def instateconstraints(self, X):
+        return checkboxconstraint(X, self.__xmin, self.__xmax)
 
-    def instateconstraints(X):
-        return checkboxconstraint(X, xmin, xmax)
+    def ininputconstraints(self, U):
+        return checkboxconstraint(U, self.__umin, self.__umax)
 
-    def ininputconstraints(U):
-        return checkboxconstraint(U, umin, umax)
-
-    def interminalconstraints(x):
+    def interminalconstraints(self, x):
         r = x.T @ self.__P @ x
         return r <= self.__alpha
         
     def feasible(self,X,U):
-        return self.instateconstraints(X) and self.ininputconstraints(U) and self.interminalconstraint(X[-1,:])
+        res = True
+        res = res and self.instateconstraints(X)
+        res = res and self.ininputconstraints(U)
+        res = res and self.interminalconstraints(X[-1,:])
+        return res
     
     def cost(self, X, U):
         cost = 0

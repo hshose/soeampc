@@ -1,6 +1,19 @@
-# all
-find . -maxdepth 3 -type d -name "datasets" -exec rm -rf {} \;
-find . -maxdepth 3 -type d -name "c_generated_code" -exec rm -rf {} \;
-find . -maxdepth 3 -type d -name "__pycache__" -exec rm -rf {} \;
+echo
+read -p "Do you want to remove ALL generated files [yN]? " -r
+echo    # (optional) move to a new line
+if [[ $REPLY =~ ^[Yy]$ ]]
+then
+    echo "Removing:"
+    find . -maxdepth 3 -type d -name "c_generated_code" -printf '\t%p\n' -exec rm -rf {} \;
+    find . -maxdepth 3 -type d -name "__pycache__" -printf '\t%p\n' -exec rm -rf {} \;
+    find . -maxdepth 3 -name "acados_ocp_*.json" -printf '\t%p\n' -exec rm {} \;
+fi
 
-find . -maxdepth 3 -name "acados_ocp_*.json" -exec rm {} \;
+echo
+read -p "Do you want to remove ALL datasets [yN]? " -r
+echo    # (optional) move to a new line
+if [[ $REPLY =~ ^[Yy]$ ]]
+then
+    echo "Removing:"
+    find . -maxdepth 3 -type d -name "datasets" -printf '\t%p\n' -exec rm -rf {} \;
+fi

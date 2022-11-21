@@ -9,12 +9,10 @@ import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..','..'))
 from pathlib import Path
 
-
 fp = Path(os.path.dirname(__file__))
 os.chdir(fp)
 
 from soeampc import *
-
 from dynamics.f import f
 
 def export_stirtank_ode_model():
@@ -32,7 +30,9 @@ def export_stirtank_ode_model():
     s_dot     = SX.sym('s_dot')
     x = vertcat( x1, x2, s)
     xdot = vertcat(x1_dot, x2_dot, s_dot)
-    fx1, fx2 = f(x1,x2,u)
+    fx = f(vertcat(x1, x2),u)
+    fx1 = fx[0]
+    fx2 = fx[1]
     rho       = float(np.genfromtxt(fp.joinpath('mpc_parameters','rho_c.txt'), delimiter=',')) # 10
     # rho       = 10
     # we set eta = 0.022
@@ -52,6 +52,10 @@ def export_stirtank_ode_model():
     model.name = model_name
 
     return model
+
+print("\n\n===============================================")
+print("Setting up ACADOS OCP problem")
+print("===============================================\n")
 
 # create ocp object to formulate the OCP
 ocp = AcadosOcp()
@@ -90,9 +94,6 @@ P_ = scipy.linalg.block_diag(P, 0)
 K = np.reshape(np.genfromtxt(fp.joinpath('mpc_parameters','K.txt'), delimiter=','), (nx, nu))
 
 mpc = MPCQuadraticCostBoxConstr(f, nx, nu, N, Tf, Q, R, P, alpha_f, K, xmin, xmax, umin, umax)
-print("\n\n\n\n\n")
-print(mpc.N)
-print("\n\n\n\n\n")
 mpc.name = model.name
 
 ocp.dims.N = N
@@ -242,7 +243,7 @@ experimentname = ""
 samplesperaxis = 100
 
 _,_,_,_, outfile = sampledataset(mpc, run,samplesperaxis, experimentname)
-print("Outfile",outfile)
+# print("Outfile",outfile)
 x0dataset, Udataset, Xdataset, computetimes = import_dataset(mpc, outfile)
 
 

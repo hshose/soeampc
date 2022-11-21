@@ -1,9 +1,9 @@
 class SafeOnlineEvaluation():
 
-    def __init__():
+    def __init__(mpc):
         self.__U_candidate = None
         self.__X_candidate = None
-        self.__mpc = None
+        self.__mpc = mpc
 
     @property
     def mpc(self):

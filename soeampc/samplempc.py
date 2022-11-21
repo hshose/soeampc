@@ -1,4 +1,5 @@
 import numpy as np
+from tqdm import tqdm
 
 from .utils import *
 
@@ -21,7 +22,9 @@ def sampledataset(mpc, run, samplesperaxis, outfile):
     Udataset =  np.empty((Nsamples, mpc.N, mpc.nu), float)
     computetimes = np.empty(Nsamples, float)
 
-    print("Evaluating MPC on grid")
+    print("\n\n===============================================")
+    print("Evaluating MPC on grid with",Nsamples,"points")
+    print("===============================================\n")
     i = np.zeros(mpc.nx)
     Nvalid = 0
 
@@ -31,8 +34,11 @@ def sampledataset(mpc, run, samplesperaxis, outfile):
         nonlocal Udataset
         nonlocal computetimes
         nonlocal Nvalid
-        
-        if n > 0:
+        if n == mpc.nx:
+            for j in tqdm(range(N[n-1])):
+                i[n-1] = j
+                loop_rec(N, n-1, i)
+        elif n > 0:
             for j in range(N[n-1]):
                 i[n-1] = j
                 loop_rec(N, n-1, i)
