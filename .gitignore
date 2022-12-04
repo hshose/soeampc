@@ -167,3 +167,5 @@ experiments/
 models/
 
 *.npy
+
+log.txt

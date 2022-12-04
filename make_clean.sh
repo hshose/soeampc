@@ -26,4 +26,5 @@ if [[ $REPLY =~ ^[Yy]$ ]]
 then
     echo "Removing:"
     find . -maxdepth 3 -type d -name "models" -printf '\t%p\n' -exec rm -rf {} \;
+    find . -maxdepth 3 -name "log.txt" -printf '\t%p\n' -exec rm {} \;
 fi
