@@ -104,3 +104,13 @@ writematrix(wbarmin, 'parameter/wbar.txt')
 writematrix(rho_c, 'parameter/rho_c.txt')
 writematrix(reshape(Pdelta.',1,[]), 'parameter/Pdelta.txt')
 writematrix(reshape(Kdelta.',1,[]), 'parameter/Kdelta.txt')
+
+
+cj = [];
+for i = 1:size(Lx,1)
+    cj = [cj; norm(Pdelta^-(1/2)*(Lx(i,:)'+Kdelta'*Lu(i,:)'),2)]
+end
+
+c_max = max(cj)
+
+writematrix(reshape(cj.',1,[]), 'parameter/Ls.txt')

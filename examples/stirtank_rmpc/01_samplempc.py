@@ -240,7 +240,7 @@ def run(x0):
 
 
 experimentname = ""
-samplesperaxis = 100
+samplesperaxis = 1000
 
 _,_,_,_, outfile = sampledataset(mpc, run,samplesperaxis, experimentname)
 # print("Outfile",outfile)
