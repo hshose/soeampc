@@ -36,7 +36,13 @@ def clipped_mae(y_true, y_pred):
     # print(tf.abs(y_pred - y_true)[tf.math.logical_not(mask)])
     return backend.mean((tf.abs(y_pred - y_true)[tf.math.logical_not(mask)]), axis=-1)
 
-def generatemodel(traindata, architecture, clipped_mae=False):
+def mpccostmaewithslack(y_true, y_pred):
+    Jtrue = 0
+    Jpred = 0
+    e = 0
+    return Jpred + e - Jtrue
+
+def generatemodel(traindata, architecture, output_shape, clipped_mae=False):
 
     X_normalizer = layers.Normalization(input_shape=[architecture[0],], axis=None)
     X_normalizer.adapt(traindata)
@@ -45,10 +51,11 @@ def generatemodel(traindata, architecture, clipped_mae=False):
     model.add(X_normalizer)
 
     for units in architecture[:-1]:
-
-        model.add(layers.Dense(units=units, activation="tanh"))
+        initializer = tf.keras.initializers.GlorotNormal()
+        model.add(layers.Dense(units=units, activation="tanh", kernel_initializer=initializer))
 
     model.add(layers.Dense(units=architecture[-1], activation="linear"))
+    model.add(layers.Reshape(output_shape))
 
 
     if clipped_mae:
@@ -61,29 +68,40 @@ def generatemodel(traindata, architecture, clipped_mae=False):
             return backend.clip(x, min_value=umin, max_value=umax)
         
         model.add(Lambda(lam, input_shape=(None, 10), output_shape=(None, 10)))
-        model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
-            loss=clipped_mae,
-            metrics=['mse', 'mae'])
-
+        loss=clipped_mae
     else:
-        model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
-            loss='mean_absolute_error',
-            metrics=['mse', 'mae'])
+        # loss='mean_absolute_error'
+        loss='mean_squared_error'
+
+    initial_learning_rate = 0.01
+    lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+            initial_learning_rate,
+            decay_steps=1000,
+            decay_rate=0.96,
+            staircase=True)
+ 
+
+    def get_lr_metric(optimizer):
+        def lr(y_true, y_pred):
+            return optimizer._decayed_lr(tf.float32) # I use ._decayed_lr method instead of .lr
+        return lr
+
+    # optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
+    lr_metric = get_lr_metric(optimizer)
+
+    model.compile(
+        optimizer=optimizer,
+        loss=loss,
+        metrics=['mse', 'mae'])
 
     return model
 
 
-def hyperparametertuning(mpc, X, Y, datasetname, architectures, maxepochs=5000, patience=1000):
+def hyperparametertuning(mpc, X, Y, datasetname, architectures, maxepochs=int(1e6), patience=int(1e4)):
     print("\nperforming hyperparameter tuning\n")
     X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
-    # X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.84, random_state=42)
-    print(X_train.shape)
-    print(Y_train.shape)
-    maxdepth = 100
-    maxwidth = 3
-    maxsteps = 5
+    output_shape=Y_train.shape[1:]
     p = Path("models").joinpath(datasetname)
     p.mkdir(parents=True,exist_ok=True)
     for a in architectures:
@@ -94,7 +112,7 @@ def hyperparametertuning(mpc, X, Y, datasetname, architectures, maxepochs=5000, 
         print("\n\n===============================================")
         print("Training Model",a)
         print("===============================================\n")
-        model = generatemodel(X_train, a)
+        model = generatemodel(X_train, a, output_shape)
         model.summary()
         batch_size = 10000
         overfitCallback = EarlyStopping(monitor='loss', min_delta=0, patience = patience)
@@ -107,7 +125,6 @@ def hyperparametertuning(mpc, X, Y, datasetname, architectures, maxepochs=5000, 
             validation_split = 0.2,
             callbacks=[overfitCallback]
             )
-        
         testresult, mu = statisticaltest(mpc, model, X_test)
         date = datetime.now().strftime("%Y%m%d-%H%M%S")
         modelname = '-'.join([str(d) for d in a]) + '_mu=' + ('%.2f' % mu) + '_' + date

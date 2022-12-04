@@ -3,64 +3,53 @@ from tqdm import tqdm
 
 from .utils import *
 
-def sampledataset(mpc, run, samplesperaxis, outfile):
+
+def sampledataset(mpc, run, sampler, outfile, runtobreak=False):
     """
 
     """
     # grid over statespace
     res = np.empty((0,2), float)
-    if isinstance(samplesperaxis, np.ndarray) and len(samplesperaxis) == mpc.nx():
-        N = np.array(samplesperaxis, dtype=int)
-    elif isinstance(samplesperaxis, int) and samplesperaxis > 0:
-        N = samplesperaxis*np.ones(mpc.nx, dtype=int)
-    else:
-        raise Exception('samplesperaxis invalid, expected positive integer or numpy array of len', mpc.nx())
     
-    Nsamples= int(np.prod(N))
-    X0dataset = np.empty((Nsamples, mpc.nx), float)
-    Xdataset =  np.empty((Nsamples, mpc.N+1, mpc.nx), float)
-    Udataset =  np.empty((Nsamples, mpc.N, mpc.nu), float)
-    computetimes = np.empty(Nsamples, float)
+    X0dataset = np.empty((sampler.Nsamples, mpc.nx), float)
+    Xdataset =  np.empty((sampler.Nsamples, mpc.N+1, mpc.nx), float)
+    Udataset =  np.empty((sampler.Nsamples, mpc.N, mpc.nu), float)
+    computetimes = np.empty(sampler.Nsamples, float)
 
     print("\n\n===============================================")
-    print("Evaluating MPC on grid with",Nsamples,"points")
+    print("Evaluating MPC on grid with",sampler.Nsamples,"points")
     print("===============================================\n")
     i = np.zeros(mpc.nx)
     Nvalid = 0
-
-    def loop_rec(N, n, i):
-        nonlocal X0dataset
-        nonlocal Xdataset
-        nonlocal Udataset
-        nonlocal computetimes
-        nonlocal Nvalid
-        if n == mpc.nx:
-            for j in tqdm(range(N[n-1])):
-                i[n-1] = j
-                loop_rec(N, n-1, i)
-        elif n > 0:
-            for j in range(N[n-1]):
-                i[n-1] = j
-                loop_rec(N, n-1, i)
-        else:
-            
-            x0 = mpc.xmin + (mpc.xmax-mpc.xmin)*i/N
-            # mpc.c.reset()
+    n = 0
+    with tqdm(total=sampler.Nsamples) as pbar:
+        while n < sampler.Nsamples:
+            x0 = mpc.xmin + (mpc.xmax-mpc.xmin)*sampler.sample()
             X, U, status, elapsed = run(x0)
             # print(status)
-            if status == 0:
+            if status == 0 or status == 2:
                 X0dataset[Nvalid,:] = x0
                 Xdataset[Nvalid,:,:]  = X
                 Udataset[Nvalid,:,:]  = U
                 computetimes[Nvalid] = elapsed
-                Nvalid +=1
-                # plot_stirtank(np.linspace(0, c.Tf, c.N+1), c.umax, c.umin, c.xmax, c.xmin, U, X)
-            # else:
-            #     print(status)
+                Nvalid += 1
+                if runtobreak:
+                    pbar.update(1)
+                    n += 1
 
-    loop_rec(N,mpc.nx,i)
-    # print(Nvalid)
-    datasetname = export_dataset(mpc, X0dataset[:Nvalid,:], Udataset[:Nvalid,:,:], Xdataset[:Nvalid,:,:], computetimes[:Nvalid], outfile)
+            if not runtobreak:
+                pbar.update(1)
+                n +=1
+
+    print("Got",Nvalid,"feasible solutions for MPC")
+
+    datasetname = export_dataset(
+        mpc,
+        X0dataset[:Nvalid,:],
+        Udataset[:Nvalid,:,:],
+        Xdataset[:Nvalid,:,:],
+        computetimes[:Nvalid],
+        outfile)
     return X0dataset[:Nvalid,:], Udataset[:Nvalid,:,:], Xdataset[:Nvalid,:,:], computetimes[:Nvalid], datasetname
 
     

@@ -7,6 +7,8 @@ import numpy as np
 import importlib
 import inspect
 
+import tensorflow.keras as keras
+
 from .mpcproblem import *
 
 def export_dataset(mpc, x0dataset, Udataset, Xdataset, computetimes, filename):
@@ -43,6 +45,7 @@ def export_dataset(mpc, x0dataset, Udataset, Xdataset, computetimes, filename):
     np.savetxt(p.joinpath("K.txt") ,    np.array(mpc.K),              delimiter=",")
 
     ffile = open(p.joinpath("f.py"),'w')
+    ffile.write('from math import *\n')
     ffile.write(inspect.getsource(mpc.f))
     ffile.close()
 
@@ -116,3 +119,8 @@ def import_mpc(file="latest"):
     f = mod.f
 
     return MPCQuadraticCostBoxConstr(f, nx, nu, N, Tf, Q, R, P, alpha_f, K, xmin, xmax, umin, umax)
+
+def import_model(datasetname="latest", modelname="latest"):
+    p = Path("models").joinpath(datasetname).joinpath(modelname)
+    model = keras.models.load_model(p)
+    return model
