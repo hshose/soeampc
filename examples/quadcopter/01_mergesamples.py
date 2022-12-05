@@ -12,11 +12,14 @@ from soeampc.utils import *
 import fire
 
 def mergesamples(now, Nsamples):
+    
+    print("\n\n===============================================")
+    print("Merging datasets for Docker_"+str(now))
+    print("===============================================\n")
+
     p=Path("datasets")
     print([name for name in os.listdir(p)])
     copyfolder = [name for name in os.listdir(p) if "Docker_"+str(now)+"_0_" in name ]
-
-    print(copyfolder)
 
     appendfolders = [name for name in os.listdir(p) if "Docker_"+str(now) in name and not "Docker_"+str(now)+"_0_" in name]
 
@@ -26,7 +29,6 @@ def mergesamples(now, Nsamples):
 
     for f in appendfolders:
         x0dataset, Udataset, Xdataset, computetimes = import_dataset(mpc, f)
-        print(computetimes)
         append_to_dataset(mpc, x0dataset, Udataset, Xdataset, computetimes, filename)
 
 
@@ -34,7 +36,8 @@ def mergesamples(now, Nsamples):
     removefolders = appendfolders
     removefolders.append(copyfolder[0])
 
-    print(removefolders)
+    print("\n\nRemoving Folders:\n")
+    print("\t",removefolders)
 
     for f in removefolders:
         shutil.rmtree(p.joinpath(f), ignore_errors=True)

@@ -100,9 +100,9 @@ def samplempc(showplot=True, experimentname="", numberofsamples=int(1e5), random
 
     ocp.dims.N = N
 
-    print("P", P)
-    print("Q", Q)
-    print("R", R)
+    print("P = \n", P, "\n")
+    print("Q = \n", Q, "\n")
+    print("R = \n", R, "\n")
 
     ocp.cost.W_e = P_
     ocp.cost.W = scipy.linalg.block_diag(Q_, R)
@@ -136,12 +136,12 @@ def samplempc(showplot=True, experimentname="", numberofsamples=int(1e5), random
     lg = -100000*np.ones(nconstr)
     ug = 100*np.ones(nconstr)
 
-    print("Lx", Lx)
-    print("Lu", Lu)
-    print("Ls", Ls)
+    print("Lx = \n", Lx,"\n")
+    print("Lu = \n", Lu,"\n")
+    print("Ls = \n", Ls,"\n")
 
-    print("C", np.hstack((Lx,Ls)) )
-    print("D", Lu )
+    print("C = \n", np.hstack((Lx,Ls)), "\n")
+    print("D = \n", Lu, "\n")
 
     ocp.constraints.C   = np.hstack((Lx,Ls))
     ocp.constraints.D   = Lu

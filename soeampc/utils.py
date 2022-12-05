@@ -32,7 +32,7 @@ def export_dataset(mpc, x0dataset, Udataset, Xdataset, computetimes, filename, b
     date = datetime.now().strftime("%Y%m%d-%H%M%S")
     Nsamples = np.shape(x0dataset)[0]
 
-    print("\nExporting Dataset with Nvalid",Nsamples,"feasible samples\n")
+    # print("\nExporting Dataset with Nvalid",Nsamples,"feasible samples\n")
     
     datasetname = mpc.name+"_N_"+str(Nsamples)+"_"+filename+date
 

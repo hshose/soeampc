@@ -7,9 +7,11 @@ import fire
 
 def rundocker(instances=16, samplesperinstance=int(1e5)):
     now = datetime.now().strftime("%Y%m%d-%H%M%S")
-    instances = 16
-    samplesperinstance = int(1e5)
-    containertag = "soeampc:batch"
+    containertag = "soeampc:"+str(now)
+
+    print("\n\n===============================================")
+    print("Building Docker container", containertag)
+    print("===============================================\n")
 
     os.chdir("/home/hose/projects/dsme/soeampc")
 
@@ -20,6 +22,10 @@ def rundocker(instances=16, samplesperinstance=int(1e5)):
         print("Docker build error... exit")
         exit()
 
+    print("\n\n===============================================")
+    print("Running", instances, "Docker container to produce", float(samplesperinstance),"datapoints each")
+    print("===============================================\n")
+
     os.chdir("/home/hose/projects/dsme/soeampc/examples/quadcopter")
     processes = []
     for i in range(instances):
@@ -28,7 +34,7 @@ def rundocker(instances=16, samplesperinstance=int(1e5)):
             out = None
         else:
             out = subprocess.DEVNULL
-        containername = "soeampc_"+str(i)
+        containername = "soeampc_samplempc_"+str(now)+"_"+str(i)
         p = subprocess.Popen(["docker", "run",
             "--rm",
             "--workdir", "/soeampc/examples/quadcopter",
@@ -43,7 +49,7 @@ def rundocker(instances=16, samplesperinstance=int(1e5)):
 
     Nsamples = int(instances*samplesperinstance)
     command = " ".join(["python3", "01_mergesamples.py", "--now="+str(now), "--Nsamples="+str(Nsamples)])
-    containername = "soeampc_merge"
+    containername = "soeampc_mergesamples_"+str(now)
     p = subprocess.Popen(["docker", "run",
         "--rm",
         "--workdir", "/soeampc/examples/quadcopter",
