@@ -11,13 +11,33 @@ import tensorflow.keras as keras
 
 from .mpcproblem import *
 
-def export_dataset(mpc, x0dataset, Udataset, Xdataset, computetimes, filename):
+def append_to_dataset(mpc, x0dataset, Udataset, Xdataset, computetimes, filename):
+    Nsamples = np.shape(x0dataset)[0]
+    p = Path("datasets").joinpath(filename, "data")
+    p.mkdir(parents=True,exist_ok=True)
+    f = open(p.joinpath("x0.txt"), 'a')
+    np.savetxt(f,  x0dataset,    delimiter=",")
+    f.close()
+    f = open(p.joinpath("X.txt"), 'a')
+    np.savetxt(f,  np.reshape( Xdataset, ( Nsamples, mpc.nx*(mpc.N+1))),  delimiter=",")
+    f.close()
+    f = open(p.joinpath("U.txt"), 'a')
+    np.savetxt(f  ,  np.reshape( Udataset, ( Nsamples, mpc.nu*mpc.N)),    delimiter=",")
+    f.close()
+    f = open(p.joinpath("ct.txt"), 'a')
+    np.savetxt(f,  computetimes, delimiter=",")
+    f.close()
+
+def export_dataset(mpc, x0dataset, Udataset, Xdataset, computetimes, filename, barefilename=False):    
     date = datetime.now().strftime("%Y%m%d-%H%M%S")
     Nsamples = np.shape(x0dataset)[0]
 
     print("\nExporting Dataset with Nvalid",Nsamples,"feasible samples\n")
     
     datasetname = mpc.name+"_N_"+str(Nsamples)+"_"+filename+date
+
+    if barefilename:
+        datasetname=filename
     
     p = Path("datasets").joinpath(datasetname, "data")
     p.mkdir(parents=True,exist_ok=True)
@@ -28,6 +48,9 @@ def export_dataset(mpc, x0dataset, Udataset, Xdataset, computetimes, filename):
 
     p = Path("datasets").joinpath(datasetname, "parameters")
     p.mkdir(parents=True,exist_ok=True)
+    with open(p.joinpath('name.txt'), 'w') as file:
+        file.write(mpc.name)
+
     np.savetxt(p.joinpath("nx.txt"),    np.array([mpc.nx]), fmt='%i', delimiter=",")
     np.savetxt(p.joinpath("nu.txt"),    np.array([mpc.nu]), fmt='%i', delimiter=",")
     np.savetxt(p.joinpath("N.txt"),     np.array([mpc.N]),  fmt='%i', delimiter=",")
@@ -118,7 +141,10 @@ def import_mpc(file="latest"):
     spec.loader.exec_module(mod)
     f = mod.f
 
-    return MPCQuadraticCostBoxConstr(f, nx, nu, N, Tf, Q, R, P, alpha_f, K, xmin, xmax, umin, umax)
+    mpc = MPCQuadraticCostBoxConstr(f, nx, nu, N, Tf, Q, R, P, alpha_f, K, xmin, xmax, umin, umax)
+    with open(p.joinpath('name.txt'), 'r') as file:
+        mpc.name = file.read().rstrip()
+    return mpc
 
 def import_model(datasetname="latest", modelname="latest"):
     p = Path("models").joinpath(datasetname).joinpath(modelname)

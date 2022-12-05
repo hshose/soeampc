@@ -1,7 +1,7 @@
 import numpy as np
 from tqdm import tqdm
 
-from .utils import *
+from .utils import export_dataset
 
 
 def sampledataset(mpc, run, sampler, outfile, runtobreak=False):

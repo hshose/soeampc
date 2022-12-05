@@ -70,8 +70,8 @@ def generatemodel(traindata, architecture, output_shape, clipped_mae=False):
         model.add(Lambda(lam, input_shape=(None, 10), output_shape=(None, 10)))
         loss=clipped_mae
     else:
-        # loss='mean_absolute_error'
-        loss='mean_squared_error'
+        loss='mean_absolute_error'
+        # loss='mean_squared_error'
 
     initial_learning_rate = 0.01
     lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
@@ -98,9 +98,9 @@ def generatemodel(traindata, architecture, output_shape, clipped_mae=False):
     return model
 
 
-def hyperparametertuning(mpc, X, Y, datasetname, architectures, maxepochs=int(1e6), patience=int(1e4)):
+def hyperparametertuning(mpc, X, Y, datasetname, architectures, maxepochs=int(1e5), patience=int(1e3)):
     print("\nperforming hyperparameter tuning\n")
-    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
+    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.1, random_state=42)
     output_shape=Y_train.shape[1:]
     p = Path("models").joinpath(datasetname)
     p.mkdir(parents=True,exist_ok=True)
@@ -122,7 +122,7 @@ def hyperparametertuning(mpc, X, Y, datasetname, architectures, maxepochs=int(1e
             verbose=2,
             batch_size=batch_size,
             epochs=maxepochs,
-            validation_split = 0.2,
+            validation_split = 0.1,
             callbacks=[overfitCallback]
             )
         testresult, mu = statisticaltest(mpc, model, X_test)
