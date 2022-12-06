@@ -60,6 +60,8 @@ def export_dataset(mpc, x0dataset, Udataset, Xdataset, computetimes, filename, b
     np.savetxt(p.joinpath("xmin.txt"),    np.array([mpc.xmin]), delimiter=",")
     np.savetxt(p.joinpath("umax.txt"),    np.array([mpc.umax]), delimiter=",")
     np.savetxt(p.joinpath("umin.txt"),    np.array([mpc.umin]), delimiter=",")
+    np.savetxt(p.joinpath("Vx.txt"),    np.array([mpc.Vx]), delimiter=",")
+    np.savetxt(p.joinpath("Vu.txt"),    np.array([mpc.Vu]), delimiter=",")
     
     np.savetxt(p.joinpath("P.txt"),     np.array(mpc.P),              delimiter=",")
     np.savetxt(p.joinpath("Q.txt"),     np.array(mpc.Q),              delimiter=",")
@@ -129,6 +131,8 @@ def import_mpc(file="latest"):
     xmin = np.genfromtxt( p.joinpath('xmin.txt'),   delimiter=',')
     umax = np.genfromtxt( p.joinpath('umax.txt'),   delimiter=',')
     umin = np.genfromtxt( p.joinpath('umin.txt'),   delimiter=',')
+    Vx = np.genfromtxt( p.joinpath('Vx.txt'),   delimiter=',')
+    Vu = np.genfromtxt( p.joinpath('Vu.txt'),   delimiter=',')
 
     Q = np.reshape( np.genfromtxt( p.joinpath( 'Q.txt' ), delimiter=','), (nx,nx))
     P = np.reshape( np.genfromtxt( p.joinpath( 'P.txt' ), delimiter=','), (nx,nx))
@@ -141,7 +145,7 @@ def import_mpc(file="latest"):
     spec.loader.exec_module(mod)
     f = mod.f
 
-    mpc = MPCQuadraticCostBoxConstr(f, nx, nu, N, Tf, Q, R, P, alpha_f, K, xmin, xmax, umin, umax)
+    mpc = MPCQuadraticCostBoxConstr(f, nx, nu, N, Tf, Q, R, P, alpha_f, K, xmin, xmax, umin, umax, Vx, Vu)
     with open(p.joinpath('name.txt'), 'r') as file:
         mpc.name = file.read().rstrip()
     return mpc

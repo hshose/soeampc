@@ -10,18 +10,21 @@ os.chdir(fp)
 
 from soeampc import *
 
-mpc = import_mpc()
-x0dataset, Udataset, Xdataset, computetimes = import_dataset(mpc)
-
 from plot import *
-dimx = 3
-dimy = 4
 
-# plot_feas(x0dataset[:,dimx],x0dataset[:,dimy],np.array([mpc.xmin[dimx], mpc.xmax[dimx]]), np.array([mpc.xmin[dimy], mpc.xmax[dimy]]))
+import fire
 
+def plotfeas(dimx, dimy, scalex=1, scaley=1, dataset='latest', onlyx0=False):
+    mpc = import_mpc(dataset)
+    x0dataset, Udataset, Xdataset, computetimes = import_dataset(mpc, dataset)
+    # plot_feas(x0dataset[:,dimx],x0dataset[:,dimy],np.array([mpc.xmin[dimx], mpc.xmax[dimx]]), np.array([mpc.xmin[dimy], mpc.xmax[dimy]]))
+    if onlyx0:
+        datx = x0dataset[:,dimx]
+        daty = x0dataset[:,dimy]
+    else:
+        datx = Xdataset[:,:,dimx].flatten()
+        daty = Xdataset[:,:,dimy].flatten()
+    plot_feas(datx, daty, scalex*np.array([mpc.xmin[dimx], mpc.xmax[dimx]]), scaley*np.array([mpc.xmin[dimy], mpc.xmax[dimy]]))
 
-datx = Xdataset[:,:,dimx].flatten()
-daty = Xdataset[:,:,dimy].flatten()
-scalex = 1
-scaley = 1
-plot_feas(datx, daty, scalex*np.array([mpc.xmin[dimx], mpc.xmax[dimx]]), scaley*np.array([mpc.xmin[dimy], mpc.xmax[dimy]]))
+if __name__=='__main__':
+    fire.Fire(plotfeas)

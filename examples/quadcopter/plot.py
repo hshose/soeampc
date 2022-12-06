@@ -22,7 +22,7 @@ def plot_quadcopter_ol(mpc, Utraj, Xtraj, labels, plt_show=True):
     N_sim = mpc.N
     nx = mpc.nx
 
-    Tf = mpc.tf
+    Tf = mpc.Tf
     t = np.linspace(0, mpc.Tf, mpc.N+1)
 
     Ts = t[1] - t[0]
@@ -30,16 +30,17 @@ def plot_quadcopter_ol(mpc, Utraj, Xtraj, labels, plt_show=True):
     Ntrajs = len(Utraj)
 
     linestyles = ['solid', 'dotted', 'dashed', 'dashdot']
-    colors = ['r','g','b','c','m','y','k']
+    looselydashed = (0, (5, 10))
+    colors = ['r','g','b','c','m','y','k', 'darkred', 'navy', 'darkgreen']
 
     xbatches = [[0,1,2], [3,4,5], [6,8], [7,9]]
-    ubatches = [[0,1,2]]
+    ubatches = [[0,1],[2]]
 
     batches = len(xbatches) + len(ubatches)
 
     for k in range(len(ubatches)):
-        plt.subplot(batches, 1, k)
-        batch = batches[k]
+        plt.subplot(batches, 1, k+1)
+        batch = ubatches[k]
         for i in range(Ntrajs):
             U = Utraj[i]
             for j in batch:
@@ -48,23 +49,23 @@ def plot_quadcopter_ol(mpc, Utraj, Xtraj, labels, plt_show=True):
         plt.title('predicted trajectory')
         plt.ylabel('inputs u')
         for j in batch:
-            plt.hlines(mpc.u_max[j], t[0], t[-1], linestyles='loosely dashed', color=colors[batch[0]-j], alpha=0.7)
-            plt.hlines(mpc.u_min[j], t[0], t[-1], linestyles='loosely dashed', color=colors[batch[0]-j], alpha=0.7)
-        plt.ylim([1.2*np.min([mpc.u_min[j] for j in batch]), 1.2*np.max([mpc.u_max[j] for j in batch])])
+            plt.hlines(mpc.umax[j], t[0], t[-1], linestyles=looselydashed, color=colors[batch[0]-j], alpha=0.7)
+            plt.hlines(mpc.umin[j], t[0], t[-1], linestyles=looselydashed, color=colors[batch[0]-j], alpha=0.7)
+        plt.ylim([1.2*np.min([mpc.umin[j] for j in batch]), 1.2*np.max([mpc.umax[j] for j in batch])])
         plt.legend(loc=1)
 
     for k in range(len(xbatches)):
         batch = xbatches[k]
-        plt.subplot(5, 1, len(ubatches)+k)
+        plt.subplot(batches, 1, len(ubatches)+k+1)
         for i in range(Ntrajs):
             X = Xtraj[i]
             for j in batch:
                 line, = plt.plot(t, X[:, j], label=labels[i]+" x"+str(j), color=colors[j], linestyle=linestyles[i])
         plt.ylabel('$x$')
         for j in batch:
-            plt.hlines(mpc.x_max[j], t[0], t[-1], linestyles='loosely dashed', color=colors[batch[0]-j],  alpha=0.7)
-            plt.hlines(mpc.x_min[j], t[0], t[-1], linestyles='loosely dashed', color=colors[batch[0]-j],  alpha=0.7)
-        plt.ylim([1.2*np.min([mpc.x_min[j] for j in batch]), 1.2*np.max([mpc.x_max[j] for j in batch])])
+            plt.hlines(mpc.xmax[j], t[0], t[-1], linestyles=looselydashed, color=colors[batch[0]-j],  alpha=0.7)
+            plt.hlines(mpc.xmin[j], t[0], t[-1], linestyles=looselydashed, color=colors[batch[0]-j],  alpha=0.7)
+        plt.ylim([1.2*np.min([mpc.xmin[j] for j in batch]), 1.2*np.max([mpc.xmax[j] for j in batch])])
         plt.grid()
         plt.legend(loc=1)
 

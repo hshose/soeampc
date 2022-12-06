@@ -4,7 +4,7 @@ from tqdm import tqdm
 from .utils import export_dataset
 
 
-def sampledataset(mpc, run, sampler, outfile, runtobreak=False):
+def sampledataset(mpc, run, sampler, outfile, runtobreak=False, verbose=False):
     """
 
     """
@@ -28,14 +28,18 @@ def sampledataset(mpc, run, sampler, outfile, runtobreak=False):
             X, U, status, elapsed = run(x0)
             # print(status)
             if status == 0 or status == 2:
-                X0dataset[Nvalid,:] = x0
-                Xdataset[Nvalid,:,:]  = X
-                Udataset[Nvalid,:,:]  = U
-                computetimes[Nvalid] = elapsed
-                Nvalid += 1
-                if runtobreak:
-                    pbar.update(1)
-                    n += 1
+                if mpc.feasible(X, U):
+                    X0dataset[Nvalid,:] = x0
+                    Xdataset[Nvalid,:,:]  = X
+                    Udataset[Nvalid,:,:]  = U
+                    computetimes[Nvalid] = elapsed
+                    Nvalid += 1
+                    if runtobreak:
+                        pbar.update(1)
+                        n += 1
+
+            # if verbose:
+                # print("Status",status,"\nforwardsimcheck MPC:", mpc.feasible(X, U, verbose=True),"\n")
 
             if not runtobreak:
                 pbar.update(1)

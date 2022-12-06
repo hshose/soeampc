@@ -2,6 +2,7 @@ from acados_template import AcadosOcp, AcadosOcpSolver, AcadosSimSolver, AcadosM
 from casadi import SX, vertcat, sin, cos, tan, Function, sign, tanh
 import numpy as np
 import scipy.linalg
+from scipy.integrate import odeint
 import math
 
 np.set_printoptions(edgeitems=3)
@@ -15,14 +16,17 @@ from pathlib import Path
 fp = Path(os.path.dirname(__file__))
 os.chdir(fp)
 
-from soeampc import RandomSampler, sampledataset, MPCQuadraticCostBoxConstr
+from soeampc import RandomSampler, sampledataset, MPCQuadraticCostBoxConstr, import_dataset
 from dynamics.f import f
 
 from plot import *
 
 import fire
 
-def samplempc(showplot=True, experimentname="", numberofsamples=int(1e5), randomseed=42):
+def samplempc(showplot=True, experimentname="", numberofsamples=int(1e5), randomseed=42, verbose=False):
+
+    rho       = float(np.genfromtxt(fp.joinpath('mpc_parameters','rho_c.txt'), delimiter=',')) # 10
+    w_bar     = float(np.genfromtxt(fp.joinpath('mpc_parameters','wbar.txt'), delimiter=',')) # 4.6e-1
 
     def export_quadcopter_ode_model():
 
@@ -39,11 +43,6 @@ def samplempc(showplot=True, experimentname="", numberofsamples=int(1e5), random
 
         # xdot
         fx = f(x,u)
-        rho       = float(np.genfromtxt(fp.joinpath('mpc_parameters','rho_c.txt'), delimiter=',')) # 10
-        # rho       = 10
-        # we set eta = 0.022
-        w_bar     = float(np.genfromtxt(fp.joinpath('mpc_parameters','wbar.txt'), delimiter=',')) # 4.6e-1
-        # w_bar     = 4.6e-1
         f_impl = vertcat(vertcat(*fx)-xdot, -rho*s+w_bar-sdot)
 
         model = AcadosModel()
@@ -80,7 +79,8 @@ def samplempc(showplot=True, experimentname="", numberofsamples=int(1e5), random
     ny_e = nx_
     alpha_f = float(np.genfromtxt(fp.joinpath('mpc_parameters','alpha.txt'), delimiter=','))
 
-
+    Sinit = odeint(lambda y,t: -rho*y+w_bar, 0, np.linspace(0,Tf,N+1))
+    print("Sinit =\n",Sinit,"\n")
 
     Q = np.reshape(np.genfromtxt(fp.joinpath('mpc_parameters','Q.txt'), delimiter=','), (nx,nx))
     P = np.reshape(np.genfromtxt(fp.joinpath('mpc_parameters','P.txt'), delimiter=','), (nx,nx))
@@ -89,13 +89,15 @@ def samplempc(showplot=True, experimentname="", numberofsamples=int(1e5), random
     P_ = scipy.linalg.block_diag(P, 1)
     K = np.reshape(np.genfromtxt(fp.joinpath('mpc_parameters','K.txt'), delimiter=','), (nx,nu))
 
-    xmin = np.array([-3, -8, -8, -5, -5, -5, -math.pi/4, -4*math.pi, -math.pi/4, -4*math.pi]) 
-    xmax = np.array([ 1,  8,  8,  5,  5,  5,  math.pi/4,  4*math.pi,  math.pi/4,  4*math.pi]) 
+    xmin = np.array([-5, -5, -10, -5, -5, -7, -math.pi/4, -2*math.pi, -math.pi/4, -2*math.pi]) 
+    xmax = np.array([ 1,  5,  10,  5,  5,  7,  math.pi/4,  2*math.pi,  math.pi/4,  2*math.pi]) 
 
     umin = np.array([ -math.pi/9, -math.pi/9, -9.8/0.91       ])
     umax = np.array([  math.pi/9,  math.pi/9,  2*9.8-9.8/0.91 ])
 
-    mpc = MPCQuadraticCostBoxConstr(f, nx, nu, N, Tf, Q, R, P, alpha_f, K, xmin, xmax, umin, umax)
+    Vx = np.array([ 1,0,0, 0,0,0, 1, 0, 1, 0 ])
+    Vu = np.array([ 1, 1, 1 ])
+    mpc = MPCQuadraticCostBoxConstr(f, nx, nu, N, Tf, Q, R, P, alpha_f, K, xmin, xmax, umin, umax, Vx, Vu)
     mpc.name = model.name
 
     ocp.dims.N = N
@@ -133,8 +135,8 @@ def samplempc(showplot=True, experimentname="", numberofsamples=int(1e5), random
     Lu = np.reshape(np.genfromtxt(fp.joinpath('mpc_parameters','Lu.txt'), delimiter=','), (nu,nconstr)).T
     Ls = np.reshape(np.genfromtxt(fp.joinpath('mpc_parameters','Ls.txt'), delimiter=','), (1,nconstr)).T
 
-    lg = -100000*np.ones(nconstr)
-    ug = 100*np.ones(nconstr)
+    # lg = -100000*np.ones(nconstr)
+    # ug = 100*np.ones(nconstr)
 
     print("Lx = \n", Lx,"\n")
     print("Lu = \n", Lu,"\n")
@@ -151,6 +153,7 @@ def samplempc(showplot=True, experimentname="", numberofsamples=int(1e5), random
     alpha_s = float(np.genfromtxt(fp.joinpath('mpc_parameters','alpha_s.txt'), delimiter=','))
     ocp.model.con_h_expr_e = ocp.model.x[:nx].T @ P @ ocp.model.x[:nx] + alpha_s*ocp.model.x[-1]
     # ocp.model.con_h_expr_e = ocp.model.x[:nx].T @ P @ ocp.model.x[:nx]
+    # ocp.model.con_h_expr_e = ocp.model.x[:nx].T @ P @ ocp.model.x[:nx]
     ocp.constraints.lh_e = np.array([-1])
     # ALPHA
     ocp.constraints.uh_e = np.array([alpha_f])
@@ -159,6 +162,7 @@ def samplempc(showplot=True, experimentname="", numberofsamples=int(1e5), random
 
     # set options
     ocp.solver_options.qp_solver = 'FULL_CONDENSING_HPIPM' # FULL_CONDENSING_QPOASES
+    # ocp.solver_options.qp_solver = 'PARTIAL_CONDENSING_HPIPM' # FULL_CONDENSING_QPOASES
     # ocp.solver_options.qp_solver = 'FULL_CONDENSING_QPOASES' # FULL_CONDENSING_QPOASES
     # PARTIAL_CONDENSING_HPIPM, FULL_CONDENSING_QPOASES, FULL_CONDENSING_HPIPM,
     # PARTIAL_CONDENSING_QPDUNES, PARTIAL_CONDENSING_OSQP
@@ -170,13 +174,15 @@ def samplempc(showplot=True, experimentname="", numberofsamples=int(1e5), random
     # ocp.solver_options.hpipm_mode = 'ROBUST'
     # ocp.solver_options.regularize_method = 'CONVEXIFY'
     ocp.solver_options.hpipm_mode='ROBUST'
-    ocp.solver_options.qp_solver_iter_max=200
+    ocp.solver_options.qp_solver_iter_max=100
+    ocp.solver_options.globalization='MERIT_BACKTRACKING'
+    ocp.solver_options.globalization_use_SOC=1
 
     # set prediction horizon
     ocp.solver_options.tf = Tf
 
     # ocp.solver_options.print_level = 2
-    ocp.solver_options.nlp_solver_max_iter = 100
+    ocp.solver_options.nlp_solver_max_iter = 200
     # ocp.solver_options.sim_method_num_stages = 6
     ocp.solver_options.sim_method_newton_iter = 10
     # ocp.solver_options.sim_method_num_steps = 100
@@ -189,11 +195,18 @@ def samplempc(showplot=True, experimentname="", numberofsamples=int(1e5), random
 
     def run(x0):
             # reset to avoid false warmstart
-            # acados_ocp_solver.reset()
+            acados_ocp_solver.reset() 
 
             # solve ocp
             acados_ocp_solver.set(0, "lbx", np.append(x0,0))
             acados_ocp_solver.set(0, "ubx", np.append(x0,0))
+
+            Xinit = np.linspace(x0,np.zeros(nx), N+1)
+            Uinit = np.array([K.T@x for x in Xinit])
+
+            for i in range(N):
+                acados_ocp_solver.set(i, "x", np.append(Xinit[i], Sinit[i]))
+                acados_ocp_solver.set(i, "u", Uinit[i])
 
             status = acados_ocp_solver.solve()
 
@@ -228,15 +241,15 @@ def samplempc(showplot=True, experimentname="", numberofsamples=int(1e5), random
     # print(run([1, 1, 0, 0,0,0, 0,0,0,0 ]))
     # print(run([1, 1, 0, 0,0,0, 0,0,0,0 ]))
 
-    _,_,_,_, outfile = sampledataset(mpc, run, sampler, experimentname,runtobreak=True)
+    _,_,_,_, outfile = sampledataset(mpc, run, sampler, experimentname, runtobreak=True, verbose=verbose)
     print("Outfile", outfile)
 
     if showplot:
         x0dataset, Udataset, Xdataset, computetimes = import_dataset(mpc, outfile)
         
-        dimx = 0
-        dimy = 1
-        plot_feas(x0dataset[:,dimx],x0dataset[:,dimy],np.array([mpc.xmin[xdim], mpc.xmax[xdim]]), np.array([mpc.xmin[ydim], mpc.xmax[ydim]]))
+        dimx = 3
+        dimy = 4
+        plot_feas(x0dataset[:,dimx],x0dataset[:,dimy],np.array([mpc.xmin[dimx], mpc.xmax[dimx]]), np.array([mpc.xmin[dimy], mpc.xmax[dimy]]))
     
     return outfile
 

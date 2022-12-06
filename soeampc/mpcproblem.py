@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 import numpy as np
 from scipy.integrate import odeint
+import scipy.linalg
 
 __all__ = ['MPC', 'MPCQuadraticCostBoxConstr']
 
@@ -151,10 +152,9 @@ class MPC(ABC):
         else:
             raise Exception('DT not implemented yet')
 
-
 class MPCQuadraticCostBoxConstr(MPC):
 
-    def __init__(self, f, nx, nu, N, Tf, Q, R, P, alpha, K, xmin, xmax, umin, umax):
+    def __init__(self, f, nx, nu, N, Tf, Q, R, P, alpha, K, xmin, xmax, umin, umax, Vx, Vu):
         super().__init__()
         super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).N.__set__( self,  N  )
         super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).nx.__set__(self,  nx )
@@ -169,10 +169,22 @@ class MPCQuadraticCostBoxConstr(MPC):
         self.__xmax = xmax
         self.__umin = umin
         self.__umax = umax
+        self.__Vx = Vx
+        self.__Vu = Vu
         self.__Q = Q
         self.__R = R
         self.__K = K
         self.__terminalcontroller = lambda x: K@x
+
+        # # if no explicit Lx and Lu are supplied, we compute them here...
+        # if Lx==None and Lu==None:
+        #     self.__Lx = np.vstack((np.diag(1/xmax), np.diag(1/xmin)))
+        #     self.__Lu = np.vstack((np.diag(1/umax), np.diag(1/umin)))
+        #     self.__ug = np.ones(self.__Lx.shape[0]+self.__Lu.shape[0])
+        # else:
+        #     self.__Lx = Lx
+        #     self.__Lu = Lu
+        #     self.__ug = np.ones(self.__Lx.shape[0]+self.__Lu.shape[0])
 
     @property
     def xmin(self):
@@ -189,6 +201,14 @@ class MPCQuadraticCostBoxConstr(MPC):
     @property
     def umax(self):
         return self.__umax
+
+    @property
+    def Vx(self):
+        return self.__Vx
+    
+    @property
+    def Vu(self):
+        return self.__Vu
 
     @property
     def P(self):
@@ -215,20 +235,25 @@ class MPCQuadraticCostBoxConstr(MPC):
         return self.__K
 
     def instateconstraints(self, X):
-        return checkboxconstraint(X, self.__xmin, self.__xmax)
+        return checkboxconstraint(self.__Vx*X, self.__xmin, self.__xmax)
 
     def ininputconstraints(self, U):
-        return checkboxconstraint(U, self.__umin, self.__umax)
+        return checkboxconstraint(self.__Vu*U, self.__umin, self.__umax)
 
     def interminalconstraints(self, x):
         r = x.T @ self.__P @ x
         return r <= self.__alpha
         
-    def feasible(self,X,U):
+    def feasible(self,X,U, verbose=False):
         res = True
         res = res and self.instateconstraints(X)
         res = res and self.ininputconstraints(U)
         res = res and self.interminalconstraints(X[-1,:])
+        if verbose and not res:
+            print("Infeasible Trajectory")
+            print("\tin state constraint:   ", self.instateconstraints(X))
+            print("\tin input constraint:   ", self.ininputconstraints(U))
+            print("\tin termial constraint: ", self.interminalconstraints(X[-1,:]))
         return res
     
     def cost(self, X, U):
