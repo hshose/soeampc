@@ -10,8 +10,8 @@ def rundocker(instances=16, samplesperinstance=int(1e5)):
     now = datetime.now().strftime("%Y%m%d-%H%M%S")
     containertag = "soeampc:"+str(now)
 
-    fp = Path(os.path.dirname(__file__))
-    soeampcdir = fp.joinpath('..','..')
+    fp = Path(os.path.abspath(os.path.dirname(__file__)))
+    soeampcdir = Path(os.path.abspath(fp.joinpath('..','..')))
 
     print("\n\n===============================================")
     print("Building Docker container", containertag)
@@ -32,6 +32,7 @@ def rundocker(instances=16, samplesperinstance=int(1e5)):
 
     os.chdir(fp)
     datasetpath = str(fp.joinpath(os.path.abspath(fp),'datasets'))
+    print("datasetpath = ", datasetpath)
     processes = []
     for i in range(instances):
         command = " ".join(["python3", "01_samplempc.py", "--showplot=False", "--randomseed=None", "--experimentname=Docker_"+str(now)+"_"+str(i)+"_", "--numberofsamples="+str(samplesperinstance)])
