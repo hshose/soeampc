@@ -2,6 +2,7 @@ import subprocess
 import time
 import os
 from datetime import datetime
+from pathlib import Path
 
 import fire
 
@@ -9,11 +10,14 @@ def rundocker(instances=16, samplesperinstance=int(1e5)):
     now = datetime.now().strftime("%Y%m%d-%H%M%S")
     containertag = "soeampc:"+str(now)
 
+    fp = Path(os.path.dirname(__file__))
+    soeampcdir = fp.joinpath('..','..')
+
     print("\n\n===============================================")
     print("Building Docker container", containertag)
     print("===============================================\n")
 
-    os.chdir("/home/hose/projects/dsme/soeampc")
+    os.chdir(soeampcdir)
 
     s = subprocess.Popen(["docker", "build",
             "-t", containertag,
@@ -26,7 +30,8 @@ def rundocker(instances=16, samplesperinstance=int(1e5)):
     print("Running", instances, "Docker container to produce", float(samplesperinstance),"datapoints each")
     print("===============================================\n")
 
-    os.chdir("/home/hose/projects/dsme/soeampc/examples/quadcopter")
+    os.chdir(fp)
+    datasetpath = str(fp.joinpath(os.path.abspath(fp),'datasets'))
     processes = []
     for i in range(instances):
         command = " ".join(["python3", "01_samplempc.py", "--showplot=False", "--randomseed=None", "--experimentname=Docker_"+str(now)+"_"+str(i)+"_", "--numberofsamples="+str(samplesperinstance)])
@@ -38,7 +43,7 @@ def rundocker(instances=16, samplesperinstance=int(1e5)):
         p = subprocess.Popen(["docker", "run",
             "--rm",
             "--workdir", "/soeampc/examples/quadcopter",
-            "-v", "/home/hose/projects/dsme/soeampc/examples/quadcopter/datasets:/soeampc/examples/quadcopter/datasets",
+            "-v", datasetpath+":/soeampc/examples/quadcopter/datasets",
             "--name", containername,
             containertag, "bash", "-c", command],
             stdout=out, stderr=out)
@@ -53,7 +58,7 @@ def rundocker(instances=16, samplesperinstance=int(1e5)):
     p = subprocess.Popen(["docker", "run",
         "--rm",
         "--workdir", "/soeampc/examples/quadcopter",
-        "-v", "/home/hose/projects/dsme/soeampc/examples/quadcopter/datasets:/soeampc/examples/quadcopter/datasets",
+        "-v", datasetpath+":/soeampc/examples/quadcopter/datasets",
         "--name", containername,
         containertag, "bash", "-c", command])
 
