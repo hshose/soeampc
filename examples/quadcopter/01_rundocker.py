@@ -54,7 +54,9 @@ def rundocker(instances=16, samplesperinstance=int(1e5)):
         p.wait()
 
     Nsamples = int(instances*samplesperinstance)
-    command = " ".join(["python3", "01_mergesamples.py", "--now="+str(now), "--Nsamples="+str(Nsamples)])
+    uid = os.getuid()
+    gid = os.getgid()
+    command = " ".join(["python3", "01_mergesamples.py", "--now="+str(now), "--Nsamples="+str(Nsamples), "&&", "chown", "-R", str(uid)+":"+str(gid), "datasets" ])
     containername = "soeampc_mergesamples_"+str(now)
     p = subprocess.Popen(["docker", "run",
         "--rm",
@@ -62,7 +64,6 @@ def rundocker(instances=16, samplesperinstance=int(1e5)):
         "-v", datasetpath+":/soeampc/examples/quadcopter/datasets",
         "--name", containername,
         containertag, "bash", "-c", command])
-
     p.wait()
 
 if __name__=="__main__":
