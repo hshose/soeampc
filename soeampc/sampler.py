@@ -11,12 +11,30 @@ class Sampler(ABC):
     def Nsamples(self):
         return self.__nmax
 
+    @property
+    def min(self):
+        return self.__min
+
+    @property
+    def max(self):
+        return self.__max
+
     @Nsamples.setter
     def Nsamples(self, Nsamples):
         if isinstance(Nsamples, int) and Nsamples > 0:
             self.__nmax = Nsamples
         else:
             raise Exception('Invalid Nsamples value, expected positive int')
+
+    @min.setter
+    def min(self, min):
+        # TODO: check for dimensions
+        self.__min = min
+
+    @max.setter
+    def max(self, max):
+        # TODO: check for dimensions
+        self.__max = max
 
     @abstractmethod
     def sample():
@@ -75,17 +93,19 @@ class GridSampler(Sampler):
             self.__i = np.zeros(self.__nmax)
         else: 
             self.updatei(self.__nmax-1)
-        
-        return res
+
+        return self.__min + res*(self.__max-self.__min)
 
 
 class RandomSampler(Sampler):
-    def __init__(self, nmax, n, seed):
+    def __init__(self, nmax, n, seed, min, max):
         super(RandomSampler,RandomSampler).Nsamples.__set__( self,  nmax  )
+        super(RandomSampler,RandomSampler).min.__set__( self,  min  )
+        super(RandomSampler,RandomSampler).max.__set__( self,  max  )
         # self.__nmax = nmax
         self.__n = n
         self.__rng = np.random.default_rng(seed)
     
     def sample(self):
-        return self.__rng.random((self.__n))
+        return self.__min + self.__rng.random((self.__n))*(self.__max-self.__min)
 
