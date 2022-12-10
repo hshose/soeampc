@@ -132,6 +132,15 @@ class MPC(ABC):
     def cost(self,X,U):
         pass
 
+    @abstractmethod
+    def savetxt(self, outpath):
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def genfromtxt(inpath):
+        pass
+
     def shiftappendterminal(self,X,U):
         U = np.concatenate((U[1:], self.__terminalcontroller(X[-1])))
         X = self.forwardsim(X[1], U)
@@ -265,6 +274,68 @@ class MPCQuadraticCostBoxConstr(MPC):
         cost = cost+X[-1]@self.__P@X[-1].T
         return cost
 
+    def savetxt(self, outpath):
+        # p = outpath.joinpath("parameters")
+        p = outpath
+        p.mkdir(parents=True,exist_ok=True)
+        with open(p.joinpath('name.txt'), 'w') as file:
+            file.write(mpc.name)
+
+        np.savetxt(p.joinpath("nx.txt"),    np.array([self.nx]), fmt='%i', delimiter=",")
+        np.savetxt(p.joinpath("nu.txt"),    np.array([self.nu]), fmt='%i', delimiter=",")
+        np.savetxt(p.joinpath("N.txt"),     np.array([self.N]),  fmt='%i', delimiter=",")
+        np.savetxt(p.joinpath("Tf.txt"),    np.array([self.Tf]),           delimiter=",")
+
+        np.savetxt(p.joinpath("xmax.txt"),  np.array([self.xmax]), delimiter=",")
+        np.savetxt(p.joinpath("xmin.txt"),  np.array([self.xmin]), delimiter=",")
+        np.savetxt(p.joinpath("umax.txt"),  np.array([self.umax]), delimiter=",")
+        np.savetxt(p.joinpath("umin.txt"),  np.array([self.umin]), delimiter=",")
+        np.savetxt(p.joinpath("Vx.txt"),    np.array([self.Vx]), delimiter=",")
+        np.savetxt(p.joinpath("Vu.txt"),    np.array([self.Vu]), delimiter=",")
+        
+        np.savetxt(p.joinpath("P.txt"),     np.array(self.P),              delimiter=",")
+        np.savetxt(p.joinpath("Q.txt"),     np.array(self.Q),              delimiter=",")
+        np.savetxt(p.joinpath("R.txt"),     np.array(self.R),              delimiter=",")
+        np.savetxt(p.joinpath("alpha.txt"), np.array([self.alpha]),        delimiter=",")
+        np.savetxt(p.joinpath("K.txt") ,    np.array(self.K),              delimiter=",")
+
+        ffile = open(p.joinpath("f.py"),'w')
+        ffile.write('from math import *\n')
+        ffile.write(inspect.getsource(mpc.f))
+        ffile.close()
+
+    @staticmethod
+    def genfromtxt(inpath):
+        p = inpath
+        # p = Path("datasets").joinpath(file, "parameters")
+        nx = int(np.genfromtxt( p.joinpath( 'nx.txt'), delimiter=',', dtype="int"))
+        nu = int(np.genfromtxt( p.joinpath( 'nu.txt'), delimiter=',', dtype="int"))
+        N  = int(np.genfromtxt( p.joinpath( 'N.txt'),  delimiter=',', dtype="int"))
+        Tf = float(np.genfromtxt( p.joinpath( 'Tf.txt'), delimiter=','))
+        alpha_f = float(np.genfromtxt( p.joinpath( 'alpha.txt'), delimiter=','))
+
+        xmax = np.genfromtxt( p.joinpath('xmax.txt'),   delimiter=',')
+        xmin = np.genfromtxt( p.joinpath('xmin.txt'),   delimiter=',')
+        umax = np.genfromtxt( p.joinpath('umax.txt'),   delimiter=',')
+        umin = np.genfromtxt( p.joinpath('umin.txt'),   delimiter=',')
+        Vx = np.genfromtxt( p.joinpath('Vx.txt'),   delimiter=',')
+        Vu = np.genfromtxt( p.joinpath('Vu.txt'),   delimiter=',')
+
+        Q = np.reshape( np.genfromtxt( p.joinpath( 'Q.txt' ), delimiter=','), (nx,nx))
+        P = np.reshape( np.genfromtxt( p.joinpath( 'P.txt' ), delimiter=','), (nx,nx))
+        R = np.reshape( np.genfromtxt( p.joinpath( 'R.txt' ), delimiter=','), (nu,nu))
+        K = np.reshape( np.genfromtxt( p.joinpath( 'K.txt' ), delimiter=','), (nx, nu))
+        
+        spec = importlib.util.spec_from_file_location("f", p.joinpath("f.py"))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        f = mod.f
+
+        mpc = MPCQuadraticCostBoxConstr(f, nx, nu, N, Tf, Q, R, P, alpha_f, K, xmin, xmax, umin, umax, Vx, Vu)
+        with open(p.joinpath('name.txt'), 'r') as file:
+            mpc.name = file.read().rstrip()
+        return mpc
+
 
 class MPCQuadraticCostLxLu(MPC):
 
@@ -360,13 +431,11 @@ class MPCQuadraticCostLxLu(MPC):
         
     def feasible(self,X,U, verbose=False):
         res = True
-        res = res and self.instateconstraints(X)
-        # res = res and self.ininputconstraints(U)
+        res = res and self.instateandinputconstraints(X, U)
         res = res and self.interminalconstraints(X[-1,:])
         if verbose and not res:
             print("Infeasible Trajectory")
-            print("\tin state constraint:   ", self.instateconstraints(X))
-            print("\tin input constraint:   ", self.ininputconstraints(U))
+            print("\tin state constraint:   ", self.instateandinputconstraints(X, U))
             print("\tin termial constraint: ", self.interminalconstraints(X[-1,:]))
         return res
     
@@ -379,6 +448,7 @@ class MPCQuadraticCostLxLu(MPC):
         cost = cost+X[-1]@self.__P@X[-1].T
         return cost
 
+<<<<<<< HEAD
 
 class MPCQuadraticCostLxLu(MPC):
 
@@ -492,3 +562,57 @@ class MPCQuadraticCostLxLu(MPC):
             cost = cost+u*R*u.T
         cost = cost+X[-1]@self.__P@X[-1].T
         return cost
+=======
+    def savetxt(self, outpath):
+        p = outpath
+        p.mkdir(parents=True,exist_ok=True)
+        with open(p.joinpath('name.txt'), 'w') as file:
+            file.write(mpc.name)
+
+        np.savetxt(p.joinpath("nx.txt"),    np.array([self.nx]), fmt='%i', delimiter=",")
+        np.savetxt(p.joinpath("nu.txt"),    np.array([self.nu]), fmt='%i', delimiter=",")
+        np.savetxt(p.joinpath("N.txt"),     np.array([self.N]),  fmt='%i', delimiter=",")
+        np.savetxt(p.joinpath("Tf.txt"),    np.array([self.Tf]),           delimiter=",")
+
+        np.savetxt(p.joinpath("Lx.txt"),    np.array(self.Lx), delimiter=",")
+        np.savetxt(p.joinpath("Lu.txt"),    np.array(self.Lu), delimiter=",")
+        
+        np.savetxt(p.joinpath("P.txt"),     np.array(self.P),              delimiter=",")
+        np.savetxt(p.joinpath("Q.txt"),     np.array(self.Q),              delimiter=",")
+        np.savetxt(p.joinpath("R.txt"),     np.array(self.R),              delimiter=",")
+        np.savetxt(p.joinpath("alpha.txt"), np.array([self.alpha]),        delimiter=",")
+        np.savetxt(p.joinpath("K.txt") ,    np.array(self.K),              delimiter=",")
+
+        ffile = open(p.joinpath("f.py"),'w')
+        ffile.write('from math import *\n')
+        ffile.write(inspect.getsource(mpc.f))
+        ffile.close()
+
+    @staticmethod
+    def genfromtxt(inpath):
+        # p = Path("datasets").joinpath(file, "parameters")
+        p = inpath
+        nx = int(np.genfromtxt( p.joinpath( 'nx.txt'), delimiter=',', dtype="int"))
+        nu = int(np.genfromtxt( p.joinpath( 'nu.txt'), delimiter=',', dtype="int"))
+        N  = int(np.genfromtxt( p.joinpath( 'N.txt'),  delimiter=',', dtype="int"))
+        Tf = float(np.genfromtxt( p.joinpath( 'Tf.txt'), delimiter=','))
+        alpha_f = float(np.genfromtxt( p.joinpath( 'alpha.txt'), delimiter=','))
+
+        Lx = np.genfromtxt( p.joinpath('Lx.txt'),   delimiter=',')
+        Lu = np.genfromtxt( p.joinpath('Lu.txt'),   delimiter=',')
+
+        Q = np.reshape( np.genfromtxt( p.joinpath( 'Q.txt' ), delimiter=','), (nx,nx))
+        P = np.reshape( np.genfromtxt( p.joinpath( 'P.txt' ), delimiter=','), (nx,nx))
+        R = np.reshape( np.genfromtxt( p.joinpath( 'R.txt' ), delimiter=','), (nu,nu))
+        K = np.reshape( np.genfromtxt( p.joinpath( 'K.txt' ), delimiter=','), (nx, nu))
+        
+        spec = importlib.util.spec_from_file_location("f", p.joinpath("f.py"))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        f = mod.f
+
+        mpc = MPCQuadraticCostLxLu(f, nx, nu, N, Tf, Q, R, P, alpha_f, K, Lx, Lu)
+        with open(p.joinpath('name.txt'), 'r') as file:
+            mpc.name = file.read().rstrip()
+        return mpc
+>>>>>>> 8765d84 (soeampc mpc import and export moved into class)
