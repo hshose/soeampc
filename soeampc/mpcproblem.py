@@ -244,11 +244,238 @@ class MPCQuadraticCostBoxConstr(MPC):
         r = x.T @ self.__P @ x
         return r <= self.__alpha
         
+    def feasible(self,X,U, verbose=False):
+        res = True
+        res = res and self.instateconstraints(X)
+        # res = res and self.ininputconstraints(U)
+        res = res and self.interminalconstraints(X[-1,:])
+        if verbose and not res:
+            print("Infeasible Trajectory")
+            print("\tin state constraint:   ", self.instateconstraints(X))
+            print("\tin input constraint:   ", self.ininputconstraints(U))
+            print("\tin termial constraint: ", self.interminalconstraints(X[-1,:]))
+        return res
+    
+    def cost(self, X, U):
+        cost = 0
+        for x in X[:-1]:
+            cost = cost+x@self.__Q@x.T
+        for u in U:
+            cost = cost+u*R*u.T
+        cost = cost+X[-1]@self.__P@X[-1].T
+        return cost
+
+
+class MPCQuadraticCostLxLu(MPC):
+
+    def __init__(self, f, nx, nu, N, Tf, Q, R, P, alpha, K, Lx, Lu):
+        super().__init__()
+        super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).N.__set__( self,  N  )
+        super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).nx.__set__(self,  nx )
+        super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).nu.__set__(self,  nu )
+        super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).Tf.__set__(self,  Tf )
+        super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).f.__set__( self,  f  )
+        super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).f_type.__set__( self,  'CT'  )
+
+        self.__P = P
+        self.__alpha = alpha
+        self.__Vx = Vx
+        self.__Vu = Vu
+        self.__Q = Q
+        self.__R = R
+        self.__K = K
+        self.__terminalcontroller = lambda x: K@x
+        if Lx.shape[0] == Lu.shape[0] and Lx.shape[1] == self.__nx and Lu.shape[1] == self.__nu:
+            self.__nconstr = Lx.shape[0]
+            self.__Lx = Lx
+            self.__Lu = Lu
+        else:
+            raise Exception("Dimensions mismatch between Lx, Lu, nx, and nu")
+        
+        # # if no explicit Lx and Lu are supplied, we compute them here...
+        # if Lx==None and Lu==None:
+        #     self.__Lx = np.vstack((np.diag(1/xmax), np.diag(1/xmin)))
+        #     self.__Lu = np.vstack((np.diag(1/umax), np.diag(1/umin)))
+        #     self.__ug = np.ones(self.__Lx.shape[0]+self.__Lu.shape[0])
+        # else:
+        #     self.__Lx = Lx
+        #     self.__Lu = Lu
+        #     self.__ug = np.ones(self.__Lx.shape[0]+self.__Lu.shape[0])
+
+    @property
+    def xmin(self):
+        return self.__xmin
+
+    @property
+    def xmax(self):
+        return self.__xmax
+
+    @property
+    def umin(self):
+        return self.__umin
+
+    @property
+    def umax(self):
+        return self.__umax
+
+    @property
+    def Vx(self):
+        return self.__Vx
+    
+    @property
+    def Vu(self):
+        return self.__Vu
+
+    @property
+    def P(self):
+        return self.__P
+
+    @property
+    def Q(self):
+        return self.__Q
+
+    @property
+    def R(self):
+        return self.__R
+
+    @property
+    def Q(self):
+        return self.__Q
+
+    @property
+    def alpha(self):
+        return self.__alpha
+
+    @property
+    def K(self):
+        return self.__K
+
+    def instateandinputconstraints(self, X, U):
+        # return np.all((self.__Lx@(X[:-1]).T + self.__Lu@U.T <= 1), axis=0)
+        return np.all( self.__Lx@(X[:-1]).T + self.__Lu@U.T <= 1 )
+
+    def interminalconstraints(self, x):
+        r = x.T @ self.__P @ x
+        return r <= self.__alpha
+        
+    def feasible(self,X,U, verbose=False):
+        res = True
+        res = res and self.instateconstraints(X)
+        # res = res and self.ininputconstraints(U)
+        res = res and self.interminalconstraints(X[-1,:])
+        if verbose and not res:
+            print("Infeasible Trajectory")
+            print("\tin state constraint:   ", self.instateconstraints(X))
+            print("\tin input constraint:   ", self.ininputconstraints(U))
+            print("\tin termial constraint: ", self.interminalconstraints(X[-1,:]))
+        return res
+    
+    def cost(self, X, U):
+        cost = 0
+        for x in X[:-1]:
+            cost = cost+x@self.__Q@x.T
+        for u in U:
+            cost = cost+u*R*u.T
+        cost = cost+X[-1]@self.__P@X[-1].T
+        return cost
+
+
+class MPCQuadraticCostLxLu(MPC):
+
+    def __init__(self, f, nx, nu, N, Tf, Q, R, P, alpha, K, Lx, Lu):
+        super().__init__()
+        super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).N.__set__( self,  N  )
+        super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).nx.__set__(self,  nx )
+        super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).nu.__set__(self,  nu )
+        super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).Tf.__set__(self,  Tf )
+        super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).f.__set__( self,  f  )
+        super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).f_type.__set__( self,  'CT'  )
+
+        self.__P = P
+        self.__alpha = alpha
+        self.__Vx = Vx
+        self.__Vu = Vu
+        self.__Q = Q
+        self.__R = R
+        self.__K = K
+        self.__terminalcontroller = lambda x: K@x
+        if Lx.shape[0] == Lu.shape[0] and Lx.shape[1] == self.__nx and Lu.shape[1] == self.__nu:
+            self.__nconstr = Lx.shape[0]
+            self.__Lx = Lx
+            self.__Lu = Lu
+        else:
+            raise Exception("Dimensions mismatch between Lx, Lu, nx, and nu")
+        
+        # # if no explicit Lx and Lu are supplied, we compute them here...
+        # if Lx==None and Lu==None:
+        #     self.__Lx = np.vstack((np.diag(1/xmax), np.diag(1/xmin)))
+        #     self.__Lu = np.vstack((np.diag(1/umax), np.diag(1/umin)))
+        #     self.__ug = np.ones(self.__Lx.shape[0]+self.__Lu.shape[0])
+        # else:
+        #     self.__Lx = Lx
+        #     self.__Lu = Lu
+        #     self.__ug = np.ones(self.__Lx.shape[0]+self.__Lu.shape[0])
+
+    @property
+    def xmin(self):
+        return self.__xmin
+
+    @property
+    def xmax(self):
+        return self.__xmax
+
+    @property
+    def umin(self):
+        return self.__umin
+
+    @property
+    def umax(self):
+        return self.__umax
+
+    @property
+    def Vx(self):
+        return self.__Vx
+    
+    @property
+    def Vu(self):
+        return self.__Vu
+
+    @property
+    def P(self):
+        return self.__P
+
+    @property
+    def Q(self):
+        return self.__Q
+
+    @property
+    def R(self):
+        return self.__R
+
+    @property
+    def Q(self):
+        return self.__Q
+
+    @property
+    def alpha(self):
+        return self.__alpha
+
+    @property
+    def K(self):
+        return self.__K
+
+    def instateandinputconstraints(self, X, U):
+        # return np.all((self.__Lx@(X[:-1]).T + self.__Lu@U.T <= 1), axis=0)
+        return np.all( self.__Lx@(X[:-1]).T + self.__Lu@U.T <= 1 )
+
+    def interminalconstraints(self, x):
+        r = x.T @ self.__P @ x
+        return r <= self.__alpha
+        
     def feasible(self,X,U, verbose=False, testinputs=True):
         res = True
         res = res and self.instateconstraints(X)
-        if testinputs:
-            res = res and self.ininputconstraints(U)
+        res = res and self.ininputconstraints(U)
         res = res and self.interminalconstraints(X[-1,:])
         if verbose and not res:
             print("Infeasible Trajectory")
