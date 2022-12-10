@@ -77,7 +77,6 @@ def samplempc(showplot=True, experimentname="", numberofsamples=int(1e5), random
     nu = model.u.size()[0]
     ny = nx_ + nu
     ny_e = nx_
-    alpha_f = float(np.genfromtxt(fp.joinpath('mpc_parameters','alpha.txt'), delimiter=','))
 
     Sinit = odeint(lambda y,t: -rho*y+w_bar, 0, np.linspace(0,Tf,N+1))
     print("Sinit =\n",Sinit,"\n")
@@ -88,6 +87,7 @@ def samplempc(showplot=True, experimentname="", numberofsamples=int(1e5), random
     Q_ = scipy.linalg.block_diag(Q, 1)
     P_ = scipy.linalg.block_diag(P, 1)
     K = np.reshape(np.genfromtxt(fp.joinpath('mpc_parameters','K.txt'), delimiter=','), (nx,nu))
+    alpha_f = float(np.genfromtxt(fp.joinpath('mpc_parameters','alpha.txt'), delimiter=','))
 
     xmin = np.array([-5, -5, -10, -5, -5, -7, -math.pi/4, -2*math.pi, -math.pi/4, -2*math.pi]) 
     xmax = np.array([ 1,  5,  10,  5,  5,  7,  math.pi/4,  2*math.pi,  math.pi/4,  2*math.pi]) 
