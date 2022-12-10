@@ -1,4 +1,4 @@
-from casadi import SX, vertcat, sin, cos, tan, Function, sign, tanh
+from casadi import tan
 def f(x, u):
     d0=10
     d1=8
