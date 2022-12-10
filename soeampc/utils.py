@@ -28,8 +28,11 @@ def append_to_dataset(mpc, x0dataset, Udataset, Xdataset, computetimes, filename
     np.savetxt(f,  computetimes, delimiter=",")
     f.close()
 
+def getdatestring():
+    return datetime.now().strftime("%Y%m%d-%H%M%S")
+
 def export_dataset(mpc, x0dataset, Udataset, Xdataset, computetimes, filename, barefilename=False):    
-    date = datetime.now().strftime("%Y%m%d-%H%M%S")
+    date = getdatestring()
     Nsamples = np.shape(x0dataset)[0]
 
     # print("\nExporting Dataset with Nvalid",Nsamples,"feasible samples\n")
