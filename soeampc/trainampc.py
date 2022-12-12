@@ -97,8 +97,43 @@ def generatemodel(traindata, architecture, output_shape, clipped_mae=False):
 
     return model
 
+def trainmodel(model, X_train, Y_train, datasetname, batchsize=int(1e4), maxepochs=int(1e3), patience=int(1e3), learning_rate=1e-3):
 
-def hyperparametertuning(mpc, X, Y, datasetname, architectures, maxepochs=int(1e5), patience=int(1e3)):
+    backend.set_value(model.optimizer.learning_rate, learning_rate)
+
+    overfitCallback = EarlyStopping(monitor='loss', min_delta=0, patience = patience)
+
+    checkpoint_filepath = Path("models").joinpath(datasetname, "checkpoint")
+    model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
+        filepath=checkpoint_filepath,
+        verbose=1,
+        # save_weights_only=True,
+        save_freq='epoch',
+        period = 100
+        )
+
+    history = model.fit(
+        X_train,
+        Y_train,
+        verbose=2,
+        batch_size=batchsize,
+        epochs=maxepochs,
+        validation_split = 0.1,
+        callbacks=[overfitCallback, model_checkpoint_callback]
+        )
+    
+    return model
+
+def retrainmodel(mpc, model, X, Y, architecturestring, datasetname, batchsize=int(1e4), maxepochs=int(1e3), patience=int(1e3), learning_rate=1e-3):
+    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.1, random_state=42)
+    model = trainmodel(model=model, X_train=X_train, Y_train=Y_train, datasetname=datasetname, batchsize=batchsize, maxepochs=maxepochs, patience=patience, learning_rate=learning_rate)
+    testresult, mu = statisticaltest(mpc, model, X_test)
+    date = datetime.now().strftime("%Y%m%d-%H%M%S")
+    modelname = architecturestring + '_mu=' + ('%.2f' % mu) + '_' + date
+    export_model(model, datasetname, modelname)
+    return model
+
+def hyperparametertuning(mpc, X, Y, datasetname, architectures, maxepochs=int(1e5), patience=int(1e3), batchsize=int(1e4)):
     print("\nperforming hyperparameter tuning\n")
     X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.1, random_state=42)
     output_shape=Y_train.shape[1:]
@@ -114,27 +149,9 @@ def hyperparametertuning(mpc, X, Y, datasetname, architectures, maxepochs=int(1e
         print("===============================================\n")
         model = generatemodel(X_train, a, output_shape)
         model.summary()
-        batch_size = 10000
-        overfitCallback = EarlyStopping(monitor='loss', min_delta=0, patience = patience)
 
-        checkpoint_filepath = Path("models").joinpath(datasetname, "checkpoint")
-        model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-            filepath=checkpoint_filepath,
-            verbose=1,
-            # save_weights_only=True,
-            save_freq='epoch',
-            period = 100
-            )
+        model = trainmodel(model, X_train, Y_train, datasetname, batchsize, maxepochs, patience)
 
-        history = model.fit(
-            X_train,
-            Y_train,
-            verbose=2,
-            batch_size=batch_size,
-            epochs=maxepochs,
-            validation_split = 0.1,
-            callbacks=[overfitCallback, model_checkpoint_callback]
-            )
         testresult, mu = statisticaltest(mpc, model, X_test)
         date = datetime.now().strftime("%Y%m%d-%H%M%S")
         modelname = '-'.join([str(d) for d in a]) + '_mu=' + ('%.2f' % mu) + '_' + date

@@ -17,7 +17,7 @@ os.chdir(fp)
 from soeampc import *
 
 
-def approximatempc(dataset="latest"):
+def approximatempc(dataset="latest", maxepochs=int(1e6), batchsize=int(1e4)):
     # import latest dataset :-D
     mpc = import_mpc(dataset)
     X, U, _, _ = import_dataset(mpc, dataset)
@@ -31,8 +31,17 @@ def approximatempc(dataset="latest"):
 
     # traverse list until architecture is found
     # datasetname = "latest"
-    model = hyperparametertuning(mpc, X, U, dataset, architectures)
+    model = hyperparametertuning(mpc, X, U, dataset, architectures, batchsize=batchsize, maxepochs=maxepochs)
 
+
+def retrainampc(datasetname="latest", modelname="latest", maxepochs = 5000):
+    # import latest dataset :-D
+    mpc = import_mpc(datasetname)
+    X, Y, _, _ = import_dataset(mpc, datasetname)
+    
+    # X_test, X_train, Y_test, Y_train = train_test_split(X, U, test_size=0.1, random_state=42)
+    model = import_model(datasetname=datasetname, modelname=modelname)
+    model = retrainmodel(mpc=mpc, model=model, X=X, Y=Y, architecturestring=modelname.split('_',1)[0], datasetname=datasetname, maxepochs = maxepochs)
 
 if __name__=="__main__":
-    fire.Fire(approximatempc)
+    fire.Fire()
