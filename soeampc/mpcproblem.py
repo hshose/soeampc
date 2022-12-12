@@ -244,10 +244,11 @@ class MPCQuadraticCostBoxConstr(MPC):
         r = x.T @ self.__P @ x
         return r <= self.__alpha
         
-    def feasible(self,X,U, verbose=False):
+    def feasible(self,X,U, verbose=False, testinputs=True):
         res = True
         res = res and self.instateconstraints(X)
-        res = res and self.ininputconstraints(U)
+        if testinputs:
+            res = res and self.ininputconstraints(U)
         res = res and self.interminalconstraints(X[-1,:])
         if verbose and not res:
             print("Infeasible Trajectory")
