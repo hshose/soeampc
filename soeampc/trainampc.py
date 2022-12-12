@@ -116,6 +116,16 @@ def hyperparametertuning(mpc, X, Y, datasetname, architectures, maxepochs=int(1e
         model.summary()
         batch_size = 10000
         overfitCallback = EarlyStopping(monitor='loss', min_delta=0, patience = patience)
+
+        checkpoint_filepath = Path("models").joinpath(datasetname, "checkpoint")
+        model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
+            filepath=checkpoint_filepath,
+            verbose=1,
+            # save_weights_only=True,
+            save_freq='epoch',
+            period = 100
+            )
+
         history = model.fit(
             X_train,
             Y_train,
@@ -123,7 +133,7 @@ def hyperparametertuning(mpc, X, Y, datasetname, architectures, maxepochs=int(1e
             batch_size=batch_size,
             epochs=maxepochs,
             validation_split = 0.1,
-            callbacks=[overfitCallback]
+            callbacks=[overfitCallback, model_checkpoint_callback]
             )
         testresult, mu = statisticaltest(mpc, model, X_test)
         date = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -142,6 +152,8 @@ def statisticaltest(mpc, model, testpoints, p=int(10e3), Tf=20, Nol=10, delta_h=
         x0 = testpoints[j, :]
         U = model(x0).numpy()
         U = np.reshape(U, (mpc.N, mpc.nu))
+        # for k in range(mpc.nu):
+        #     U[k,:] = np.clip(U[k,:], mpc.umin[k], mpc.umax[k])
         X = mpc.forwardsim(x0,U)
         I[j] = mpc.feasible(X,U)
     
