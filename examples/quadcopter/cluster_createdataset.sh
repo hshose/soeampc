@@ -9,8 +9,8 @@
 #SBATCH --time=08:00:00
 
 ### CPUS
-#SBATCH --ntasks=24
-#SBATCH --cpus-per-task=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=24
 
 ### File for the output
 #SBATCH --output=/home/hh753317/projects/dsme/soeampc/examples/quadcopter/logs/Cluster.%J.log
