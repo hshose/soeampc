@@ -34,14 +34,14 @@ def approximatempc(dataset="latest", maxepochs=int(1e6), batchsize=int(1e4)):
     model = hyperparametertuning(mpc, X, U, dataset, architectures, batchsize=batchsize, maxepochs=maxepochs)
 
 
-def retrainampc(datasetname="latest", modelname="latest", maxepochs = 5000):
+def retrainampc(datasetname="latest", modelname="latest", maxepochs = 5000, learningrate=1e-3):
     # import latest dataset :-D
     mpc = import_mpc(datasetname)
     X, Y, _, _ = import_dataset(mpc, datasetname)
     
     # X_test, X_train, Y_test, Y_train = train_test_split(X, U, test_size=0.1, random_state=42)
     model = import_model(datasetname=datasetname, modelname=modelname)
-    model = retrainmodel(mpc=mpc, model=model, X=X, Y=Y, architecturestring=modelname.split('_',1)[0], datasetname=datasetname, maxepochs = maxepochs)
+    model = retrainmodel(mpc=mpc, model=model, X=X, Y=Y, architecturestring=modelname.split('_',1)[0], datasetname=datasetname, maxepochs = maxepochs, learning_rate=learningrate)
 
 if __name__=="__main__":
     fire.Fire()

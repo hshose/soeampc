@@ -23,7 +23,10 @@ from plot import *
 
 import fire
 
-def samplempc(showplot=True, experimentname="", numberofsamples=int(1e5), randomseed=42, verbose=False):
+# on cluster
+# python3 01_samplempc.py --showplot=False --randomseed=None --experimentname=Cluster_$(date +"%Y_%m_%d_%I_%M_%p")_${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}, --numberofsamples=100 --generate=False
+
+def samplempc(showplot=True, experimentname="", numberofsamples=int(1e5), randomseed=42, verbose=False, generate=True):
 
     rho       = float(np.genfromtxt(fp.joinpath('mpc_parameters','rho_c.txt'), delimiter=',')) # 10
     w_bar     = float(np.genfromtxt(fp.joinpath('mpc_parameters','wbar.txt'), delimiter=',')) # 4.6e-1
@@ -187,7 +190,10 @@ def samplempc(showplot=True, experimentname="", numberofsamples=int(1e5), random
     ocp.solver_options.sim_method_newton_iter = 10
     # ocp.solver_options.sim_method_num_steps = 100
 
-    acados_ocp_solver = AcadosOcpSolver(ocp, json_file = 'acados_ocp_' + model.name + '.json')
+    if generate:
+        acados_ocp_solver = AcadosOcpSolver(ocp, json_file = 'acados_ocp_' + model.name + '.json')
+    else:
+        acados_ocp_solver = AcadosOcpSolver(ocp, json_file = 'acados_ocp_' + model.name + '.json', build = False, generate=False)
 
     # for i in range(N):
     #     print(acados_ocp_solver.get(i,'x'))
