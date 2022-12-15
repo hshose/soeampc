@@ -126,6 +126,7 @@ def trainmodel(model, X_train, Y_train, datasetname, batchsize=int(1e4), maxepoc
 
 def retrainmodel(mpc, model, X, Y, architecturestring, datasetname, batchsize=int(1e4), maxepochs=int(1e3), patience=int(1e3), learning_rate=1e-3):
     X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.1, random_state=42)
+    print("X[42]", X_train[42])
     model = trainmodel(model=model, X_train=X_train, Y_train=Y_train, datasetname=datasetname, batchsize=batchsize, maxepochs=maxepochs, patience=patience, learning_rate=learning_rate)
     testresult, mu = statisticaltest(mpc, model, X_test)
     date = datetime.now().strftime("%Y%m%d-%H%M%S")
