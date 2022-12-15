@@ -107,11 +107,12 @@ def export_model(model, datasetname, modelname):
 
 
 def import_dataset(mpc, file="latest"):
+
     p = Path("datasets").joinpath(file, "data")
-    x0raw       = np.genfromtxt( p.joinpath("x0.txt"), delimiter=",")
-    Xraw        = np.genfromtxt( p.joinpath("X.txt"), delimiter=",")
-    Uraw        = np.genfromtxt( p.joinpath("U.txt"), delimiter=",")
-    computetimes    = np.genfromtxt( p.joinpath("ct.txt"), delimiter=",")
+    x0raw       = np.loadtxt( p.joinpath("x0.txt"), delimiter=",")
+    Xraw        = np.loadtxt( p.joinpath("X.txt"), delimiter=",")
+    Uraw        = np.loadtxt( p.joinpath("U.txt"), delimiter=",")
+    computetimes    = np.loadtxt( p.joinpath("ct.txt"), delimiter=",")
 
     Nsamples  =  np.shape(x0raw)[0]
     x0dataset =  x0raw.reshape( Nsamples,   mpc.nx )
