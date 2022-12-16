@@ -24,7 +24,8 @@ from plot import *
 import fire
 
 # on cluster
-# python3 01_samplempc.py --showplot=False --randomseed=None --experimentname=Cluster_$(date +"%Y_%m_%d_%I_%M_%p")_${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}, --numberofsamples=100 --generate=False
+# python3 01_samplempc.py --showplot=False --randomseed=None --experimentname=test_generate --numberofsamples=100 --generate=True
+# python3 01_samplempc.py --showplot=False --randomseed=None --experimentname=Cluster_$(date +"%Y_%m_%d_%I_%M_%p")_${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID} --numberofsamples=100 --generate=False
 
 def samplempc(showplot=True, experimentname="", numberofsamples=int(1e5), randomseed=42, verbose=False, generate=True):
 
