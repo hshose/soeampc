@@ -24,11 +24,11 @@ def sampledataset(mpc, run, sampler, outfile, runtobreak=False, verbose=False):
     n = 0
     with tqdm(total=sampler.Nsamples) as pbar:
         while n < sampler.Nsamples:
-            x0 = mpc.xmin + (mpc.xmax-mpc.xmin)*sampler.sample()
+            x0 = sampler.sample()
             X, U, status, elapsed = run(x0)
             # print(status)
             if status == 0 or status == 2:
-                if mpc.feasible(X, U):
+                if mpc.feasible(X, U, verbose=True):
                     X0dataset[Nvalid,:] = x0
                     Xdataset[Nvalid,:,:]  = X
                     Udataset[Nvalid,:,:]  = U
