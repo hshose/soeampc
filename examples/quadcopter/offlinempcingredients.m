@@ -5,6 +5,8 @@ clc;
 addpath('/home/hose/software/casadi')
 import casadi.*
 
+writeout = false
+
 %% grid over statespace
 nx=10;
 nu=3; 
@@ -15,12 +17,12 @@ nu=3;
 % xe1     = 0.2632
 % xe2     = 0.6519
 
-g=9.8
+g=9.8;
 
 phivert = [ 0, tan(pi/4)^2;
             tan(pi/4)^2, 0;
             tan(pi/4)^2,tan(pi/4)^2;
-            0,0]
+            0,0];
 
 
 d0 = 10;
@@ -151,7 +153,7 @@ rhs = zeros(Nz,1);
 for k=1:Nz
     C(k) = norm(inv(sqrtm(P))*[eye(nx), K']*L(k,:)');
     C_lqr(k) = norm(inv(sqrtm(P_lqr))*[eye(nx), -K_lqr']*L(k,:)');
-    rhs(k) = (l(k)-L(k,:)*r)^2;
+    rhs(k) = (l(k)-L(k,:)*r);
 end
 
 res = rhs./C;
@@ -172,13 +174,13 @@ disp(idx)
 % disp("maximum omega_R [rpm]")
 % disp(sqrt(norm(inv(sqrtm(P))*[eye(7), K']*L(7,:)')^2*alpha)*60/2/pi)
 
-
-writematrix(reshape(round(P,6),1,[]), 'mpc_parameters/P.txt');
-writematrix(reshape(round(Q,6),1,[]), 'mpc_parameters/Q.txt');
-writematrix(reshape(round(K,6),1,[]), 'mpc_parameters/K.txt');
-writematrix(reshape(round(R,6),1,[]), 'mpc_parameters/R.txt');
-writematrix(alpha,             'mpc_parameters/alpha.txt');
-
+if writeout
+    writematrix(reshape(round(P,6),1,[]), 'mpc_parameters/P.txt');
+    writematrix(reshape(round(Q,6),1,[]), 'mpc_parameters/Q.txt');
+    writematrix(reshape(round(K,6),1,[]), 'mpc_parameters/K.txt');
+    writematrix(reshape(round(R,6),1,[]), 'mpc_parameters/R.txt');
+    writematrix(alpha,             'mpc_parameters/alpha.txt');
+end
 
 
 % Constraint Tighetning
@@ -244,12 +246,12 @@ Kdelta=Y*X^-1
 dmax = sqrt(wbar/Pdelta(2,2))
 wbarmin = dw(1,:)*Pdelta*dw(1,:)'
 
-
-writematrix(round(wbarmin, 6),                'mpc_parameters/wbar.txt')
-writematrix(round(rho_c, 6),                  'mpc_parameters/rho_c.txt')
-writematrix(reshape(round(Pdelta,6),1,[]), 'mpc_parameters/Pdelta.txt')
-writematrix(reshape(round(Kdelta,6),1,[]), 'mpc_parameters/Kdelta.txt')
-
+if writeout
+    writematrix(round(wbarmin, 6),                'mpc_parameters/wbar.txt')
+    writematrix(round(rho_c, 6),                  'mpc_parameters/rho_c.txt')
+    writematrix(reshape(round(Pdelta,6),1,[]), 'mpc_parameters/Pdelta.txt')
+    writematrix(reshape(round(Kdelta,6),1,[]), 'mpc_parameters/Kdelta.txt')
+end
 
 cj = [];
 for i = 1:size(L,1)
@@ -259,14 +261,17 @@ end
 
 c_max = max(cj);
 
-writematrix(reshape(round(cj,6),1,[]), 'mpc_parameters/Ls.txt')
-writematrix(reshape(round(Lx,6),1,[]), 'mpc_parameters/Lx.txt')
-writematrix(reshape(round(Lu,6),1,[]), 'mpc_parameters/Lu.txt')
-
+if writeout
+    writematrix(reshape(round(cj,6),1,[]), 'mpc_parameters/Ls.txt')
+    writematrix(reshape(round(Lx,6),1,[]), 'mpc_parameters/Lx.txt')
+    writematrix(reshape(round(Lu,6),1,[]), 'mpc_parameters/Lu.txt')
+end
 
 alpha_s = norm(sqrtm(P)*inv(sqrtm(Pdelta)));
 Tf = 3
-writematrix(Tf,                  'mpc_parameters/Tf.txt')
 alpha - alpha_s*(1-exp(-rho_c*Tf))/rho_c*wbarmin
 
-writematrix(alpha_s,'mpc_parameters/alpha_s.txt');
+if writeout
+    writematrix(Tf,     'mpc_parameters/Tf.txt')
+    writematrix(alpha_s,'mpc_parameters/alpha_s.txt');
+end
