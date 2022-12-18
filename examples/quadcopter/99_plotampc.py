@@ -26,6 +26,7 @@ def plotampc(dataset='latest', model='latest'):
     mpc = import_mpc(dataset)
     X, U, _, _ = import_dataset(mpc, dataset)
     X_train, X_test, Y_train, Y_test = train_test_split(X, U, test_size=0.1, random_state=42)
+    # X_test, X_train, Y_test, Y_train = train_test_split(X, U, test_size=0.1, random_state=42)
     model = import_model(model)
 
     # i = 1234
