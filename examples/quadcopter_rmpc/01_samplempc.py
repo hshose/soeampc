@@ -23,23 +23,30 @@ from plot import *
 
 import fire
 
-def samplempc(showplot=True, experimentname="", numberofsamples=int(1e5), randomseed=42, verbose=False):
+def samplempc(showplot=True, experimentname="", numberofsamples=int(5000), randomseed=42, verbose=False):
 
     rho       = float(np.genfromtxt(fp.joinpath('mpc_parameters','rho_c.txt'), delimiter=',')) # 10
     w_bar     = float(np.genfromtxt(fp.joinpath('mpc_parameters','wbar.txt'), delimiter=',')) # 4.6e-1
 
+    nx = 10
+    nu = 3
+    Kdelta = np.reshape(np.genfromtxt(fp.joinpath('mpc_parameters','Kdelta.txt'), delimiter=','), (nx,nu))
+    print("Kdelta=\n",Kdelta.T,"\n")
+    
     def export_quadcopter_ode_model():
 
         model_name = 'quadcopter'
 
         # set up states & controls
-        nx = 10
-        nu = 3
         x = SX.sym('x', nx, 1)
         u = SX.sym('u', nu, 1)
+        v = SX.sym('u', nu, 1)
         xdot = SX.sym('xdot', nx, 1)
         s     =  SX.sym('s')
         sdot     =  SX.sym('sdot')
+
+        # print(x.shape)
+        u = Kdelta.T @ x + v
 
         # xdot
         fx = f(x,u)
@@ -51,7 +58,7 @@ def samplempc(showplot=True, experimentname="", numberofsamples=int(1e5), random
         # model.f_expl_expr = f_expl
         model.x = vertcat(x, s)
         model.xdot = vertcat(xdot, sdot)
-        model.u = u
+        model.u = v
         # model.z = z
         model.p = []
         model.name = model_name
@@ -129,29 +136,38 @@ def samplempc(showplot=True, experimentname="", numberofsamples=int(1e5), random
     #         x + Lx s <= xmax
     # 1 <= x/xmin - s 
     #      x/xmax + s <= 1
+    
+    nxconstr = 5
+    nuconstr = 6
+    nconstr = nxconstr + nuconstr
 
-    nconstr = 11
     Lx = np.reshape(np.genfromtxt(fp.joinpath('mpc_parameters','Lx.txt'), delimiter=','), (nx,nconstr)).T
     Lu = np.reshape(np.genfromtxt(fp.joinpath('mpc_parameters','Lu.txt'), delimiter=','), (nu,nconstr)).T
     Ls = np.reshape(np.genfromtxt(fp.joinpath('mpc_parameters','Ls.txt'), delimiter=','), (1,nconstr)).T
 
-    # lg = -100000*np.ones(nconstr)
-    # ug = 100*np.ones(nconstr)
+    print(Lu[nxconstr:nxconstr+nu])
+    print(Lu[nxconstr:nxconstr+nu]@Kdelta.T)
+    print(Lx[nxconstr:nxconstr+nu, :])
+    
+    Lx[nxconstr:nxconstr+nu, :] = Lu[nxconstr:nxconstr+nu]@Kdelta.T
+    Lx[nxconstr+nu:nxconstr+2*nu, :] = Lu[nxconstr+nu:nxconstr+2*nu]@Kdelta.T
 
     print("Lx = \n", Lx,"\n")
     print("Lu = \n", Lu,"\n")
     print("Ls = \n", Ls,"\n")
-
+    
     print("C = \n", np.hstack((Lx,Ls)), "\n")
     print("D = \n", Lu, "\n")
 
     ocp.constraints.C   = np.hstack((Lx,Ls))
     ocp.constraints.D   = Lu
-    ocp.constraints.lg  = -100*np.ones(nconstr)
+    ocp.constraints.lg  = -10000*np.ones(nconstr)
     ocp.constraints.ug  = np.ones(nconstr)
 
     alpha_s = float(np.genfromtxt(fp.joinpath('mpc_parameters','alpha_s.txt'), delimiter=','))
     ocp.constraints.lh_e = np.array([-1])
+
+    ## Terminal set constraint formulations
 
     ## |P^0.5 * x| \leq alpha - | P^0.5 * P_delta^-0.5 | s_f = alpha - alpha_s * s_f
     # sqrtmP = scipy.linalg.sqrtm(P)
@@ -165,12 +181,6 @@ def samplempc(showplot=True, experimentname="", numberofsamples=int(1e5), random
     ## x' * P * x \leq ( alpha - alpha_s * s_f )^2
     ocp.model.con_h_expr_e = ocp.model.x[:nx].T @ P @ ocp.model.x[:nx]
     ocp.constraints.uh_e = np.array([ ( alpha_f - alpha_s*(1-math.exp(-rho*Tf))/rho*w_bar )**2 ])
-
-
-    # ocp.model.con_h_expr_e = ocp.model.x[:nx].T @ P @ ocp.model.x[:nx]
-    # ocp.model.con_h_expr_e = ocp.model.x[:nx].T @ P @ ocp.model.x[:nx]
-    # ocp.constraints.lh_e = np.array([-1])
-    # ALPHA
 
     ocp.constraints.x0 = np.zeros(nx_)
 
