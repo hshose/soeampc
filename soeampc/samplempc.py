@@ -28,6 +28,8 @@ def sampledataset(mpc, run, sampler, outfile, runtobreak=False, verbose=False):
             X, U, status, elapsed = run(x0)
             # print(status)
             if status == 0 or status == 2:
+                if verbose:
+                    print("acados status: ", status)
                 if mpc.feasible(X, U, verbose=True):
                     X0dataset[Nvalid,:] = x0
                     Xdataset[Nvalid,:,:]  = X
