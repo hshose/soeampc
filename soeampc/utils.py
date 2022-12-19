@@ -4,9 +4,6 @@ import os
 import errno
 import numpy as np
 
-import importlib
-import inspect
-
 import tensorflow.keras as keras
 
 from .mpcproblem import *
