@@ -1,9 +1,11 @@
 from abc import ABC, abstractmethod
 import numpy as np
 from scipy.integrate import odeint
-import scipy.linalg
 
-__all__ = ['MPC', 'MPCQuadraticCostBoxConstr']
+import importlib
+import inspect
+
+__all__ = ['MPC', 'MPCQuadraticCostBoxConstr', 'MPCQuadraticCostLxLu']
 
 def checkboxconstraint(series, lower, upper):
     for s in series:
@@ -68,6 +70,13 @@ class MPC(ABC):
         """
         return self.__terminalcontroller
 
+    @property
+    def stabilizingfeedbackcontroller(self):
+        """`stabilizingfeedbackcontroller(x)` - evaluates the therminal controller for given state x
+        Default: :code:'None'.
+        """
+        return self.__stabilizingfeedbackcontroller
+
     @name.setter
     def name(self, name):
         if isinstance(name, str):
@@ -124,6 +133,14 @@ class MPC(ABC):
         else:
             raise Exception('Invalid terminalcontroller, must be callable')
 
+    @stabilizingfeedbackcontroller.setter
+    def stabilizingfeedbackcontroller(self, stabilizingfeedbackcontroller):
+        if callable(stabilizingfeedbackcontroller):
+            self.__stabilizingfeedbackcontroller = stabilizingfeedbackcontroller
+        else:
+            raise Exception('Invalid stabilizingfeedbackcontroller, must be callable')
+
+
     @abstractmethod
     def feasible(self,X,U):
         pass
@@ -153,11 +170,25 @@ class MPC(ABC):
             def f_pwconst_input(y,t,U,Ts):
                     x = y
                     idx = min( int(t/Ts), np.shape(U)[0]-1)
-                    u = U[idx,:]
+                    u = self.__stabilizingfeedbackcontroller(x, U[idx,:])
                     return tuple(self.__f(x, u))
 
             X = odeint(f_pwconst_input, x, t, args=(U, Ts))
             return X
+        else:
+            raise Exception('DT not implemented yet')
+
+    def singlestepsim(self,x,u):
+        Ts = self.__Tf/self.__N
+        t = np.linspace(0,Ts,2)
+        if self.f_type == 'CT':
+            def f_pwconst_input(y,t):
+                    x = y
+                    ustable = self.__stabilizingfeedbackcontroller(x, u)
+                    return tuple(self.__f(x, ustable))
+
+            X = odeint(f_pwconst_input, x, t)
+            return X[-1]
         else:
             raise Exception('DT not implemented yet')
 
@@ -339,7 +370,7 @@ class MPCQuadraticCostBoxConstr(MPC):
 
 class MPCQuadraticCostLxLu(MPC):
 
-    def __init__(self, f, nx, nu, N, Tf, Q, R, P, alpha, K, Lx, Lu):
+    def __init__(self, f, nx, nu, N, Tf, Q, R, P, alpha, K, Lx, Lu, Kdelta=None):
         super().__init__()
         super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).N.__set__( self,  N  )
         super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).nx.__set__(self,  nx )
@@ -348,15 +379,27 @@ class MPCQuadraticCostLxLu(MPC):
         super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).f.__set__( self,  f  )
         super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).f_type.__set__( self,  'CT'  )
 
+
         self.__P = P
         self.__alpha = alpha
-        self.__Vx = Vx
-        self.__Vu = Vu
         self.__Q = Q
         self.__R = R
         self.__K = K
-        self.__terminalcontroller = lambda x: K@x
-        if Lx.shape[0] == Lu.shape[0] and Lx.shape[1] == self.__nx and Lu.shape[1] == self.__nu:
+        
+        # if no Kdelta is set, this reverts to no stabilizing feedback.
+        if isinstance(Kdelta, type(None)):
+            self.__Kdelta = np.zeros((self.nu, self.nx))
+        elif Kdelta.shape[0] == self.nu and Kdelta.shape[1] == self.nx:
+            self.__Kdelta = Kdelta
+        else: 
+            raise Exception("Dimension mismatch between Kdelta, nx, and nu!")
+    
+        # self.__stabilizingfeedbackcontroller = lambda x,v: self.__Kdelta @ x + v 
+        # self.__terminalcontroller = lambda x: (self.__K-self.__Kdelta) @ x
+        super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).stabilizingfeedbackcontroller.__set__( self,  lambda x,v: self.__Kdelta @ x + v  )
+        super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).terminalcontroller.__set__( self,  lambda x: (self.__K-self.__Kdelta) @ x  )
+
+        if Lx.shape[0] == Lu.shape[0] and Lx.shape[1] == self.nx and Lu.shape[1] == self.nu:
             self.__nconstr = Lx.shape[0]
             self.__Lx = Lx
             self.__Lu = Lu
@@ -374,28 +417,12 @@ class MPCQuadraticCostLxLu(MPC):
         #     self.__ug = np.ones(self.__Lx.shape[0]+self.__Lu.shape[0])
 
     @property
-    def xmin(self):
-        return self.__xmin
-
-    @property
-    def xmax(self):
-        return self.__xmax
-
-    @property
-    def umin(self):
-        return self.__umin
-
-    @property
-    def umax(self):
-        return self.__umax
-
-    @property
-    def Vx(self):
-        return self.__Vx
+    def Lx(self):
+        return self.__Lx
     
     @property
-    def Vu(self):
-        return self.__Vu
+    def Lu(self):
+        return self.__Lu
 
     @property
     def P(self):
@@ -421,137 +448,32 @@ class MPCQuadraticCostLxLu(MPC):
     def K(self):
         return self.__K
 
-    def instateandinputconstraints(self, X, U):
+    @property
+    def Kdelta(self):
+        return self.__Kdelta
+
+    def instateandinputconstraints(self, X, U, verbose = False, eps = 1e-6):
         # return np.all((self.__Lx@(X[:-1]).T + self.__Lu@U.T <= 1), axis=0)
-        return np.all( self.__Lx@(X[:-1]).T + self.__Lu@U.T <= 1 )
+        constrineq = ( self.__Lx@(X[:-1]).T + self.__Lu@U.T - 1 <= eps )
+        if verbose and not np.all(constrineq):
+            print("\t LxLu constraints violated:   ", np.where(constrineq == False))
+        return np.all( constrineq )
 
-    def interminalconstraints(self, x):
+    def interminalconstraints(self, x, verbose = False, eps = 1e-6):
         r = x.T @ self.__P @ x
-        return r <= self.__alpha
-        
-    def feasible(self,X,U, verbose=False):
-        res = True
-        res = res and self.instateandinputconstraints(X, U)
-        res = res and self.interminalconstraints(X[-1,:])
-        if verbose and not res:
-            print("Infeasible Trajectory")
-            print("\tin state constraint:   ", self.instateandinputconstraints(X, U))
-            print("\tin termial constraint: ", self.interminalconstraints(X[-1,:]))
-        return res
-    
-    def cost(self, X, U):
-        cost = 0
-        for x in X[:-1]:
-            cost = cost+x@self.__Q@x.T
-        for u in U:
-            cost = cost+u*R*u.T
-        cost = cost+X[-1]@self.__P@X[-1].T
-        return cost
-
-<<<<<<< HEAD
-
-class MPCQuadraticCostLxLu(MPC):
-
-    def __init__(self, f, nx, nu, N, Tf, Q, R, P, alpha, K, Lx, Lu):
-        super().__init__()
-        super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).N.__set__( self,  N  )
-        super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).nx.__set__(self,  nx )
-        super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).nu.__set__(self,  nu )
-        super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).Tf.__set__(self,  Tf )
-        super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).f.__set__( self,  f  )
-        super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).f_type.__set__( self,  'CT'  )
-
-        self.__P = P
-        self.__alpha = alpha
-        self.__Vx = Vx
-        self.__Vu = Vu
-        self.__Q = Q
-        self.__R = R
-        self.__K = K
-        self.__terminalcontroller = lambda x: K@x
-        if Lx.shape[0] == Lu.shape[0] and Lx.shape[1] == self.__nx and Lu.shape[1] == self.__nu:
-            self.__nconstr = Lx.shape[0]
-            self.__Lx = Lx
-            self.__Lu = Lu
-        else:
-            raise Exception("Dimensions mismatch between Lx, Lu, nx, and nu")
-        
-        # # if no explicit Lx and Lu are supplied, we compute them here...
-        # if Lx==None and Lu==None:
-        #     self.__Lx = np.vstack((np.diag(1/xmax), np.diag(1/xmin)))
-        #     self.__Lu = np.vstack((np.diag(1/umax), np.diag(1/umin)))
-        #     self.__ug = np.ones(self.__Lx.shape[0]+self.__Lu.shape[0])
-        # else:
-        #     self.__Lx = Lx
-        #     self.__Lu = Lu
-        #     self.__ug = np.ones(self.__Lx.shape[0]+self.__Lu.shape[0])
-
-    @property
-    def xmin(self):
-        return self.__xmin
-
-    @property
-    def xmax(self):
-        return self.__xmax
-
-    @property
-    def umin(self):
-        return self.__umin
-
-    @property
-    def umax(self):
-        return self.__umax
-
-    @property
-    def Vx(self):
-        return self.__Vx
-    
-    @property
-    def Vu(self):
-        return self.__Vu
-
-    @property
-    def P(self):
-        return self.__P
-
-    @property
-    def Q(self):
-        return self.__Q
-
-    @property
-    def R(self):
-        return self.__R
-
-    @property
-    def Q(self):
-        return self.__Q
-
-    @property
-    def alpha(self):
-        return self.__alpha
-
-    @property
-    def K(self):
-        return self.__K
-
-    def instateandinputconstraints(self, X, U):
-        # return np.all((self.__Lx@(X[:-1]).T + self.__Lu@U.T <= 1), axis=0)
-        return np.all( self.__Lx@(X[:-1]).T + self.__Lu@U.T <= 1 )
-
-    def interminalconstraints(self, x):
-        r = x.T @ self.__P @ x
-        return r <= self.__alpha
+        constrineq = ( r - (self.__alpha**2) <= eps )
+        if verbose and not constrineq:
+            print("\t Terminal constraint x.T P x = ", r, " <= ", self.__alpha**2, "is violated")
+        return constrineq
         
     def feasible(self,X,U, verbose=False, testinputs=True):
         res = True
-        res = res and self.instateconstraints(X)
-        res = res and self.ininputconstraints(U)
+        res = res and self.instateandinputconstraints(X,U)
         res = res and self.interminalconstraints(X[-1,:])
         if verbose and not res:
             print("Infeasible Trajectory")
-            print("\tin state constraint:   ", self.instateconstraints(X))
-            print("\tin input constraint:   ", self.ininputconstraints(U))
-            print("\tin termial constraint: ", self.interminalconstraints(X[-1,:]))
+            print("\tin state constraint:   ", self.instateandinputconstraints(X, U, verbose=True))
+            print("\tin termial constraint: ", self.interminalconstraints(X[-1,:], verbose=True))
         return res
     
     def cost(self, X, U):
@@ -562,30 +484,31 @@ class MPCQuadraticCostLxLu(MPC):
             cost = cost+u*R*u.T
         cost = cost+X[-1]@self.__P@X[-1].T
         return cost
-=======
+    
     def savetxt(self, outpath):
         p = outpath
         p.mkdir(parents=True,exist_ok=True)
         with open(p.joinpath('name.txt'), 'w') as file:
-            file.write(mpc.name)
+            file.write(self.name)
 
         np.savetxt(p.joinpath("nx.txt"),    np.array([self.nx]), fmt='%i', delimiter=",")
         np.savetxt(p.joinpath("nu.txt"),    np.array([self.nu]), fmt='%i', delimiter=",")
         np.savetxt(p.joinpath("N.txt"),     np.array([self.N]),  fmt='%i', delimiter=",")
         np.savetxt(p.joinpath("Tf.txt"),    np.array([self.Tf]),           delimiter=",")
 
-        np.savetxt(p.joinpath("Lx.txt"),    np.array(self.Lx), delimiter=",")
-        np.savetxt(p.joinpath("Lu.txt"),    np.array(self.Lu), delimiter=",")
+        np.savetxt(p.joinpath("Lx.txt"),      np.array(self.Lx),      delimiter=",")
+        np.savetxt(p.joinpath("Lu.txt"),      np.array(self.Lu),      delimiter=",")
         
-        np.savetxt(p.joinpath("P.txt"),     np.array(self.P),              delimiter=",")
-        np.savetxt(p.joinpath("Q.txt"),     np.array(self.Q),              delimiter=",")
-        np.savetxt(p.joinpath("R.txt"),     np.array(self.R),              delimiter=",")
-        np.savetxt(p.joinpath("alpha.txt"), np.array([self.alpha]),        delimiter=",")
-        np.savetxt(p.joinpath("K.txt") ,    np.array(self.K),              delimiter=",")
+        np.savetxt(p.joinpath("P.txt"),       np.array(self.P),       delimiter=",")
+        np.savetxt(p.joinpath("Q.txt"),       np.array(self.Q),       delimiter=",")
+        np.savetxt(p.joinpath("R.txt"),       np.array(self.R),       delimiter=",")
+        np.savetxt(p.joinpath("alpha.txt"),   np.array([self.alpha]), delimiter=",")
+        np.savetxt(p.joinpath("K.txt") ,      np.array(self.K),       delimiter=",")
+        np.savetxt(p.joinpath("Kdelta.txt"),  np.array(self.Kdelta),  delimiter=",")
 
         ffile = open(p.joinpath("f.py"),'w')
         ffile.write('from math import *\n')
-        ffile.write(inspect.getsource(mpc.f))
+        ffile.write(inspect.getsource(self.f))
         ffile.close()
 
     @staticmethod
@@ -601,18 +524,18 @@ class MPCQuadraticCostLxLu(MPC):
         Lx = np.genfromtxt( p.joinpath('Lx.txt'),   delimiter=',')
         Lu = np.genfromtxt( p.joinpath('Lu.txt'),   delimiter=',')
 
-        Q = np.reshape( np.genfromtxt( p.joinpath( 'Q.txt' ), delimiter=','), (nx,nx))
-        P = np.reshape( np.genfromtxt( p.joinpath( 'P.txt' ), delimiter=','), (nx,nx))
-        R = np.reshape( np.genfromtxt( p.joinpath( 'R.txt' ), delimiter=','), (nu,nu))
-        K = np.reshape( np.genfromtxt( p.joinpath( 'K.txt' ), delimiter=','), (nx, nu))
+        Q = np.genfromtxt( p.joinpath( 'Q.txt' ), delimiter=',')
+        P = np.genfromtxt( p.joinpath( 'P.txt' ), delimiter=',')
+        R = np.genfromtxt( p.joinpath( 'R.txt' ), delimiter=',')
+        K = np.genfromtxt( p.joinpath( 'K.txt' ), delimiter=',')
+        Kdelta = np.genfromtxt( p.joinpath( 'Kdelta.txt' ), delimiter=',')
         
         spec = importlib.util.spec_from_file_location("f", p.joinpath("f.py"))
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         f = mod.f
 
-        mpc = MPCQuadraticCostLxLu(f, nx, nu, N, Tf, Q, R, P, alpha_f, K, Lx, Lu)
+        mpc = MPCQuadraticCostLxLu(f, nx, nu, N, Tf, Q, R, P, alpha_f, K, Lx, Lu, Kdelta)
         with open(p.joinpath('name.txt'), 'r') as file:
             mpc.name = file.read().rstrip()
         return mpc
->>>>>>> 8765d84 (soeampc mpc import and export moved into class)
