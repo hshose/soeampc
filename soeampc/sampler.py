@@ -107,5 +107,5 @@ class RandomSampler(Sampler):
         self.__rng = np.random.default_rng(seed)
     
     def sample(self):
-        return self.__min + self.__rng.random((self.__n))*(self.__max-self.__min)
+        return self.min + self.__rng.random((self.__n))*(self.max-self.min)
 
