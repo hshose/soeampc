@@ -37,7 +37,7 @@ Y = sdpvar(nu,nx);
 X = sdpvar(nx);
 % mpc stage cost
 Q = diag([ones(1,3), 1e-2*ones(1,7)]);
-R = eye(3);
+R = 10*eye(3);
 e=0;
 
 %% iterate over grid and add lmi constraints
@@ -181,7 +181,7 @@ Y = sdpvar(nu,nx);
 X = sdpvar(nx);
 
 
-uw = 3.5e-3*[  1,  1,  1;
+uw = 3e-3*[  1,  1,  1;
              1,  1, -1;
              1, -1,  1;
              1, -1, -1;

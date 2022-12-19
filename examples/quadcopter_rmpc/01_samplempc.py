@@ -16,22 +16,35 @@ from pathlib import Path
 fp = Path(os.path.dirname(__file__))
 os.chdir(fp)
 
-from soeampc import RandomSampler, sampledataset, MPCQuadraticCostBoxConstr, import_dataset
+from soeampc import RandomSampler, sampledataset, MPCQuadraticCostLxLu, import_dataset
 from dynamics.f import f
 
 from plot import *
 
 import fire
 
-def samplempc(showplot=True, experimentname="", numberofsamples=int(5000), randomseed=42, verbose=False):
+def samplempc(
+        showplot=True,
+        experimentname="",
+        numberofsamples=int(5000),
+        randomseed=42,
+        verbose=False,
+        withstabilizingfeedback=True,
+        generate=True):
+
+    print("\n\n===============================================")
+    print("Setting up ACADOS OCP problem")
+    print("===============================================\n")
 
     rho       = float(np.genfromtxt(fp.joinpath('mpc_parameters','rho_c.txt'), delimiter=',')) # 10
     w_bar     = float(np.genfromtxt(fp.joinpath('mpc_parameters','wbar.txt'), delimiter=',')) # 4.6e-1
 
     nx = 10
     nu = 3
-    Kdelta = np.reshape(np.genfromtxt(fp.joinpath('mpc_parameters','Kdelta.txt'), delimiter=','), (nx,nu))
-    print("Kdelta=\n",Kdelta.T,"\n")
+    Kdelta = None
+    if withstabilizingfeedback:
+        Kdelta = np.reshape(np.genfromtxt(fp.joinpath('mpc_parameters','Kdelta.txt'), delimiter=','), (nx,nu)).T
+        print("Kdelta=\n",Kdelta,"\n")
     
     def export_quadcopter_ode_model():
 
@@ -39,14 +52,15 @@ def samplempc(showplot=True, experimentname="", numberofsamples=int(5000), rando
 
         # set up states & controls
         x = SX.sym('x', nx, 1)
-        u = SX.sym('u', nu, 1)
-        v = SX.sym('u', nu, 1)
+        u = SX.sym('u', nu, 1)       
         xdot = SX.sym('xdot', nx, 1)
         s     =  SX.sym('s')
         sdot     =  SX.sym('sdot')
 
         # print(x.shape)
-        u = Kdelta.T @ x + v
+        if withstabilizingfeedback:
+            v = SX.sym('u', nu, 1)
+            u = Kdelta @ x + v
 
         # xdot
         fx = f(x,u)
@@ -58,16 +72,15 @@ def samplempc(showplot=True, experimentname="", numberofsamples=int(5000), rando
         # model.f_expl_expr = f_expl
         model.x = vertcat(x, s)
         model.xdot = vertcat(xdot, sdot)
-        model.u = v
+        if withstabilizingfeedback:
+            model.u = v
+        else:
+            model.u = u
         # model.z = z
         model.p = []
         model.name = model_name
 
         return model
-
-    print("\n\n===============================================")
-    print("Setting up ACADOS OCP problem")
-    print("===============================================\n")
 
     # create ocp object to formulate the OCP
     ocp = AcadosOcp()
@@ -93,19 +106,8 @@ def samplempc(showplot=True, experimentname="", numberofsamples=int(5000), rando
     R = np.reshape(np.genfromtxt(fp.joinpath('mpc_parameters','R.txt'), delimiter=','), (nu,nu))
     Q_ = scipy.linalg.block_diag(Q, 1)
     P_ = scipy.linalg.block_diag(P, 1)
-    K = np.reshape(np.genfromtxt(fp.joinpath('mpc_parameters','K.txt'), delimiter=','), (nx,nu))
+    K = np.reshape(np.genfromtxt(fp.joinpath('mpc_parameters','K.txt'), delimiter=','), (nx,nu)).T
     alpha_f = float(np.genfromtxt(fp.joinpath('mpc_parameters','alpha.txt'), delimiter=','))
-
-    xmin = np.array([-5, -5, -10, -5, -5, -7, -math.pi/4, -2*math.pi, -math.pi/4, -2*math.pi]) 
-    xmax = np.array([ 1,  5,  10,  5,  5,  7,  math.pi/4,  2*math.pi,  math.pi/4,  2*math.pi]) 
-
-    umin = np.array([ -math.pi/9, -math.pi/9, -9.8/0.91       ])
-    umax = np.array([  math.pi/9,  math.pi/9,  2*9.8-9.8/0.91 ])
-
-    Vx = np.array([ 1,0,0, 0,0,0, 1, 0, 1, 0 ])
-    Vu = np.array([ 1, 1, 1 ])
-    mpc = MPCQuadraticCostBoxConstr(f, nx, nu, N, Tf, Q, R, P, alpha_f, K, xmin, xmax, umin, umax, Vx, Vu)
-    mpc.name = model.name
 
     ocp.dims.N = N
 
@@ -145,12 +147,13 @@ def samplempc(showplot=True, experimentname="", numberofsamples=int(5000), rando
     Lu = np.reshape(np.genfromtxt(fp.joinpath('mpc_parameters','Lu.txt'), delimiter=','), (nu,nconstr)).T
     Ls = np.reshape(np.genfromtxt(fp.joinpath('mpc_parameters','Ls.txt'), delimiter=','), (1,nconstr)).T
 
-    print(Lu[nxconstr:nxconstr+nu])
-    print(Lu[nxconstr:nxconstr+nu]@Kdelta.T)
-    print(Lx[nxconstr:nxconstr+nu, :])
-    
-    Lx[nxconstr:nxconstr+nu, :] = Lu[nxconstr:nxconstr+nu]@Kdelta.T
-    Lx[nxconstr+nu:nxconstr+2*nu, :] = Lu[nxconstr+nu:nxconstr+2*nu]@Kdelta.T
+    # constrain umin <= Kdelta @ x + v <= umax
+    # the imported Lu is Lx @ x + Lu @ u <= 1
+    # therefore: Lu @ Kdelta @ x + Lu @ v <= 1
+    #           |---- Lx ----|
+    if withstabilizingfeedback:
+        Lx[nxconstr:nxconstr+nu, :] = Lu[nxconstr:nxconstr+nu]@Kdelta
+        Lx[nxconstr+nu:nxconstr+2*nu, :] = Lu[nxconstr+nu:nxconstr+2*nu]@Kdelta
 
     print("Lx = \n", Lx,"\n")
     print("Lu = \n", Lu,"\n")
@@ -161,11 +164,11 @@ def samplempc(showplot=True, experimentname="", numberofsamples=int(5000), rando
 
     ocp.constraints.C   = np.hstack((Lx,Ls))
     ocp.constraints.D   = Lu
-    ocp.constraints.lg  = -10000*np.ones(nconstr)
+    ocp.constraints.lg  = -100000*np.ones(nconstr)
     ocp.constraints.ug  = np.ones(nconstr)
 
     alpha_s = float(np.genfromtxt(fp.joinpath('mpc_parameters','alpha_s.txt'), delimiter=','))
-    ocp.constraints.lh_e = np.array([-1])
+    ocp.constraints.lh_e = np.array([-10000])
 
     ## Terminal set constraint formulations
 
@@ -180,38 +183,73 @@ def samplempc(showplot=True, experimentname="", numberofsamples=int(5000), rando
 
     ## x' * P * x \leq ( alpha - alpha_s * s_f )^2
     ocp.model.con_h_expr_e = ocp.model.x[:nx].T @ P @ ocp.model.x[:nx]
-    ocp.constraints.uh_e = np.array([ ( alpha_f - alpha_s*(1-math.exp(-rho*Tf))/rho*w_bar )**2 ])
+    alpha = alpha_f - alpha_s*(1-math.exp(-rho*Tf))/rho*w_bar
+    print("\nalpha_f=", alpha_f, "\n")
+    print("\nalpha_s=", alpha_s, "\n")
+    print("\nalpha=", alpha, "\n")
+    if alpha < 0:
+        raise Exception("Terminal set size alpha_f - alpha_s * s_T is negative: ", alpha )
+    else: 
+        ocp.constraints.uh_e = np.array([ alpha**2 ])
 
     ocp.constraints.x0 = np.zeros(nx_)
+
+    ## SOFT TERMINAL CONSTRAINTS
+    # ocp.constraints.Jsh_e = np.eye(1)
+    # L2_pen = 1e5
+    # L1_pen = 1e3
+    # ocp.cost.Zl_e = L2_pen * np.ones((1,))
+    # ocp.cost.Zu_e = L2_pen * np.ones((1,))
+    # ocp.cost.zl_e = L1_pen * np.ones((1,))
+    # ocp.cost.zu_e = L1_pen * np.ones((1,))
+
+    # mpc = MPCQuadraticCostLxLu(f, nx, nu, N, Tf, Q, R, P, alpha_f, K, xmin, xmax, umin, umax, Vx, Vu)
+    mpc = MPCQuadraticCostLxLu( f, nx, nu, N, Tf, Q, R, P, alpha_f, K, Lx, Lu, Kdelta)
+    mpc.name = model.name
 
     # set options
     ocp.solver_options.qp_solver = 'FULL_CONDENSING_HPIPM' # FULL_CONDENSING_QPOASES
     # ocp.solver_options.qp_solver = 'PARTIAL_CONDENSING_HPIPM' # FULL_CONDENSING_QPOASES
-    # ocp.solver_options.qp_solver = 'FULL_CONDENSING_QPOASES' # FULL_CONDENSING_QPOASES
+    # ocp.solver_options.qp_solver = 'PARTIAL_CONDENSING_OSQP' # FULL_CONDENSING_QPOASES
     # PARTIAL_CONDENSING_HPIPM, FULL_CONDENSING_QPOASES, FULL_CONDENSING_HPIPM,
     # PARTIAL_CONDENSING_QPDUNES, PARTIAL_CONDENSING_OSQP
     ocp.solver_options.hessian_approx = 'GAUSS_NEWTON'
     # ocp.solver_options.hessian_approx = 'EXACT'
+
     ocp.solver_options.integrator_type = 'IRK'
     ocp.solver_options.nlp_solver_type = 'SQP' # SQP_RTI, SQP
     # ocp.solver_options.levenberg_marquardt = 0.1
-    # ocp.solver_options.hpipm_mode = 'ROBUST'
     # ocp.solver_options.regularize_method = 'CONVEXIFY'
     ocp.solver_options.hpipm_mode='ROBUST'
     ocp.solver_options.qp_solver_iter_max=100
+    ocp.solver_options.qp_tol = 1e-10
+
+
+    # ocp.solver_options.levenberg_marquardt = 1e-1
     ocp.solver_options.globalization='MERIT_BACKTRACKING'
     ocp.solver_options.globalization_use_SOC=1
+    ocp.solver_options.alpha_reduction = 0.1
+    ocp.solver_options.alpha_min = 0.001
+    # ocp.solver_options.eps_sufficient_descent = 1e-2
+
+    # ocp.solver_options.regularize_method = 'PROJECT'
+    ocp.solver_options.regularize_method = 'MIRROR'
 
     # set prediction horizon
     ocp.solver_options.tf = Tf
 
     # ocp.solver_options.print_level = 2
-    ocp.solver_options.nlp_solver_max_iter = 200
+    
+    ocp.solver_options.nlp_solver_max_iter = 1000
+    ocp.solver_options.tol = 1e-9
     # ocp.solver_options.sim_method_num_stages = 6
-    ocp.solver_options.sim_method_newton_iter = 10
+    # ocp.solver_options.sim_method_newton_iter = 10
     # ocp.solver_options.sim_method_num_steps = 100
 
-    acados_ocp_solver = AcadosOcpSolver(ocp, json_file = 'acados_ocp_' + model.name + '.json')
+    if generate:
+        acados_ocp_solver = AcadosOcpSolver(ocp, json_file = 'acados_ocp_' + model.name + '.json')
+    else:
+        acados_ocp_solver = AcadosOcpSolver(ocp, json_file = 'acados_ocp_' + model.name + '.json', build = False, generate=False)
 
     # for i in range(N):
     #     print(acados_ocp_solver.get(i,'x'))
@@ -226,7 +264,20 @@ def samplempc(showplot=True, experimentname="", numberofsamples=int(5000), rando
             acados_ocp_solver.set(0, "ubx", np.append(x0,0))
 
             Xinit = np.linspace(x0,np.zeros(nx), N+1)
-            Uinit = np.array([K.T@x for x in Xinit])
+            Uinit = np.zeros((N,nu))
+
+            # Xinit = np.zeros((N+1,nx))
+            # Xinit[0] = x0
+            # Xinit = np.linspace(x0,np.zeros(nx), N+1)
+            # Uinit = np.array([K@x for x in Xinit])
+
+            # print("x0",x0)
+            # for i in range(N):
+                # Uinit[i] = K @ Xinit[i]
+                # print("Unit", Uinit[i])
+                # Xinit[i+1] = mpc.singlestepsim(Xinit[i], Uinit[i])
+
+            # print("Xinit",Xinit)
 
             for i in range(N):
                 acados_ocp_solver.set(i, "x", np.append(Xinit[i], Sinit[i]))
@@ -238,10 +289,10 @@ def samplempc(showplot=True, experimentname="", numberofsamples=int(5000), rando
                 status = acados_ocp_solver.solve()
 
 
-            # if status != 0 and status !=2:
-                # print('acados acados_ocp_solver returned status {}. Exiting.'.format(status))
-                # print(x0)
-                # acados_ocp_solver.print_statistics()
+            # if status == 0 or status == 2:
+            #     print('acados acados_ocp_solver returned status {}. Exiting.'.format(status))
+            #     print(x0)
+            #     acados_ocp_solver.print_statistics()
 
             X = np.ndarray((N+1, nx))
             S = np.ndarray(N+1)
@@ -258,8 +309,12 @@ def samplempc(showplot=True, experimentname="", numberofsamples=int(5000), rando
             return X,U, status, computetime
 
 
+    xmin = np.array([-5, -5, -10, -5, -5, -7, -math.pi/4, -2*math.pi, -math.pi/4, -2*math.pi]) 
+    xmax = np.array([ 1,  5,  10,  5,  5,  7,  math.pi/4,  2*math.pi,  math.pi/4,  2*math.pi]) 
+    umin = np.array([ -math.pi/9, -math.pi/9, -9.8/0.91       ])
+    umax = np.array([  math.pi/9,  math.pi/9,  2*9.8-9.8/0.91 ])
     # sampler = RandomSampler(int(100),mpc.nx, 42)
-    sampler = RandomSampler(numberofsamples,mpc.nx, randomseed)
+    sampler = RandomSampler(numberofsamples, mpc.nx, randomseed, xmin, xmax)
 
     # print(run([-5, -5, -10, 0,0,0, 0,0,0,0 ]))
     # print(run([1, 1, 0, 0,0,0, 0,0,0,0 ]))
@@ -273,7 +328,7 @@ def samplempc(showplot=True, experimentname="", numberofsamples=int(5000), rando
         
         dimx = 3
         dimy = 4
-        plot_feas(x0dataset[:,dimx],x0dataset[:,dimy],np.array([mpc.xmin[dimx], mpc.xmax[dimx]]), np.array([mpc.xmin[dimy], mpc.xmax[dimy]]))
+        plot_feas(x0dataset[:,dimx],x0dataset[:,dimy])
     
     return outfile
 
