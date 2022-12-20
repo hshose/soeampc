@@ -62,11 +62,11 @@ def plotmpc(dataset='latest'):
     # xmax = np.array([ 1,  None,  None,  None,  None,  None,  math.pi/10,  None,  math.pi/10,  None]) 
     # umin = np.array([ -4*math.pi, -4*math.pi, -9.8/0.91       ])
     # umax = np.array([  4*math.pi,  4*math.pi,  2*9.8-9.8/0.91 ])
-    
-    xmin = np.array([None, None, None, None,    None, None, -math.pi/4,  None, -math.pi/4, None]) 
-    xmax = np.array([ 1,  None,  None,  None,  None,  None,  math.pi/4,  None,  math.pi/4,  None]) 
-    umin = np.array([ -math.pi/9, -math.pi/9, -9.8/0.91       ])
-    umax = np.array([  math.pi/9,  math.pi/9,  2*9.8-9.8/0.91 ])
+
+    xmin = np.array([None, None, None, None,    None, None, -math.pi*20/180,  None, -math.pi*20/180, None]) 
+    xmax = np.array([ 1,  None,  None,  None,  None,  None,  math.pi*20/180,  None,  math.pi*20/180,  None]) 
+    umin = np.array([ -35*math.pi/180, -35*math.pi/180, -9.81/0.91       ])
+    umax = np.array([  35*math.pi/180,  35*math.pi/180,  18-9.81/0.91 ])
     
 
     limits = {
