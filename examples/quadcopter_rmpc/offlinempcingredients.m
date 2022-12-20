@@ -36,8 +36,8 @@ rho_c=0.192*3;
 Y = sdpvar(nu,nx);
 X = sdpvar(nx);
 % mpc stage cost
-Q = diag([ones(1,3), 1e-2*ones(1,7)]);
-R = 10*eye(3);
+Q = diag([1,1,0.1, 1e-1*ones(1,7)]);
+R = diag([10,10,0.01]);
 e=0;
 
 %% iterate over grid and add lmi constraints
@@ -83,6 +83,12 @@ K=Y*P;
 % A = full(Afunc(zeros(nx,1), zeros(nu,1)));
 % B = full(Bfunc(zeros(nx,1), zeros(nu,1)));
 [K_lqr,P_lqr] = lqr(A,B,Q+e*eye(nx),R);
+
+% LQR for initializing MPC
+[K_lqr_init,P_lqr_init] = lqr(A,B,diag([1,1,0.1, 1, 1, 1e-3, 1, 1e-1, 1, 1e-1]),diag([1e-3, 1e-3,1e-3]));
+if writeout
+    writematrix(reshape(round(-K_lqr_init,6),1,[]), 'mpc_parameters/Kinit.txt');
+end
 
 disp("max(eig(P/P_lqr))")
 disp(eigs(P/P_lqr,1))

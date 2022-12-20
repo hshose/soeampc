@@ -30,7 +30,9 @@ def samplempc(
         randomseed=42,
         verbose=False,
         withstabilizingfeedback=True,
-        generate=True):
+        generate=True,
+        nlpiter=1000
+        ):
 
     print("\n\n===============================================")
     print("Setting up ACADOS OCP problem")
@@ -107,6 +109,7 @@ def samplempc(
     Q_ = scipy.linalg.block_diag(Q, 1)
     P_ = scipy.linalg.block_diag(P, 1)
     K = np.reshape(np.genfromtxt(fp.joinpath('mpc_parameters','K.txt'), delimiter=','), (nx,nu)).T
+    Kinit = np.reshape(np.genfromtxt(fp.joinpath('mpc_parameters','Kinit.txt'), delimiter=','), (nx,nu)).T
     alpha_f = float(np.genfromtxt(fp.joinpath('mpc_parameters','alpha.txt'), delimiter=','))
 
     ocp.dims.N = N
@@ -238,9 +241,9 @@ def samplempc(
     # set prediction horizon
     ocp.solver_options.tf = Tf
 
-    # ocp.solver_options.print_level = 2
+    ocp.solver_options.print_level = 0
     
-    ocp.solver_options.nlp_solver_max_iter = 1000
+    ocp.solver_options.nlp_solver_max_iter = nlpiter
     ocp.solver_options.tol = 1e-9
     # ocp.solver_options.sim_method_num_stages = 6
     # ocp.solver_options.sim_method_newton_iter = 10
@@ -248,16 +251,21 @@ def samplempc(
 
     if generate:
         acados_ocp_solver = AcadosOcpSolver(ocp, json_file = 'acados_ocp_' + model.name + '.json')
-    else:
-        acados_ocp_solver = AcadosOcpSolver(ocp, json_file = 'acados_ocp_' + model.name + '.json', build = False, generate=False)
 
     # for i in range(N):
     #     print(acados_ocp_solver.get(i,'x'))
     #     print(acados_ocp_solver.get(i,'u'))
 
-    def run(x0):
+    xmin = np.array([-5, -5, -10, -5, -5, -7, -math.pi/4, -2*math.pi, -math.pi/4, -2*math.pi]) 
+    xmax = np.array([ 1,  5,  10,  5,  5,  7,  math.pi/4,  2*math.pi,  math.pi/4,  2*math.pi]) 
+    umin = np.array([ -math.pi/9, -math.pi/9, -9.8/0.91       ])
+    umax = np.array([  math.pi/9,  math.pi/9,  2*9.8-9.8/0.91 ])
+    # sampler = RandomSampler(int(100),mpc.nx, 42)
+    sampler = RandomSampler(numberofsamples, mpc.nx, randomseed, xmin, xmax)
+
+    def run(x0, verbose=False):
             # reset to avoid false warmstart
-            acados_ocp_solver.reset() 
+            acados_ocp_solver = AcadosOcpSolver(ocp, json_file = 'acados_ocp_' + model.name + '.json', build = False, generate=False)
 
             # solve ocp
             acados_ocp_solver.set(0, "lbx", np.append(x0,0))
@@ -270,14 +278,17 @@ def samplempc(
             # Xinit[0] = x0
             # Xinit = np.linspace(x0,np.zeros(nx), N+1)
             # Uinit = np.array([K@x for x in Xinit])
+            # Kinit = K
+            for i in range(N):
+                Uinit[i] = Kinit @ Xinit[i]
+                Uinit[i] = np.clip(Uinit[i], umin-Kdelta@Xinit[i], umax-Kdelta@Xinit[i])
+                Xinit[i+1] = mpc.singlestepsim(Xinit[i], Uinit[i])
 
-            # print("x0",x0)
-            # for i in range(N):
-                # Uinit[i] = K @ Xinit[i]
-                # print("Unit", Uinit[i])
-                # Xinit[i+1] = mpc.singlestepsim(Xinit[i], Uinit[i])
-
-            # print("Xinit",Xinit)
+            if verbose:
+                print("\nx0 =\n",x0)
+                print("\nXinit =\n ",Xinit)
+                print("\nUinit =\n ",Uinit)
+                print("\nfeasible = ",mpc.feasible(Xinit, Uinit, verbose=True))
 
             for i in range(N):
                 acados_ocp_solver.set(i, "x", np.append(Xinit[i], Sinit[i]))
@@ -285,9 +296,14 @@ def samplempc(
 
             status = acados_ocp_solver.solve()
 
-            if status == 1 or status == 2 or status == 4:
-                status = acados_ocp_solver.solve()
+            # if status == 1 or status == 2 or status == 4:
+                # status = acados_ocp_solver.solve()
 
+
+            # if status != 0 or status != 2:
+            #     print('acados acados_ocp_solver returned status {}. Exiting.'.format(status))
+            #     print(x0)
+            #     acados_ocp_solver.print_statistics()
 
             # if status == 0 or status == 2:
             #     print('acados acados_ocp_solver returned status {}. Exiting.'.format(status))
@@ -308,28 +324,39 @@ def samplempc(
             # print(status)
             return X,U, status, computetime
 
+    
+    # print("\n\nrun([0, 0, -1, 0,0,0, 0,0,0,0 ])")
+    # print(run([0, 0, -1, 0,0,0, 0,0,0,0 ]))
+    
+    # print("\n\nrun([0, 0, -5, 0,0,0, 0,0,0,0 ])")
+    # print(run([0, 0, -5, 0,0,0, 0,0,0,0 ]))
+    
+    # print("\n\nrun([0, 0, -8, 0,0,0, 0,0,0,0 ])")
+    # X,U, status, _ = run([0, 0, -15, 0,0,0, 0,0,0,0 ])
+    # X,U, status, _ = run([0, -3.5, -15, 0,0,0, 0,0,0,0 ])
+    # X,U, status, _ = run([-2, -2, -15, 0,0,0, 0,0,0,0 ])
+    # X,U, status, _ = run([-5, -5, -10, 0,0,0, 0,0,0,0 ])
+    # print("ACADOS status = ", status)
+    # mpc.feasible(X,U, verbose=True)
 
-    xmin = np.array([-5, -5, -10, -5, -5, -7, -math.pi/4, -2*math.pi, -math.pi/4, -2*math.pi]) 
-    xmax = np.array([ 1,  5,  10,  5,  5,  7,  math.pi/4,  2*math.pi,  math.pi/4,  2*math.pi]) 
-    umin = np.array([ -math.pi/9, -math.pi/9, -9.8/0.91       ])
-    umax = np.array([  math.pi/9,  math.pi/9,  2*9.8-9.8/0.91 ])
-    # sampler = RandomSampler(int(100),mpc.nx, 42)
-    sampler = RandomSampler(numberofsamples, mpc.nx, randomseed, xmin, xmax)
-
-    # print(run([-5, -5, -10, 0,0,0, 0,0,0,0 ]))
+    
+    # print(run([0, 0, -1, 0,0,0, 0,0,0,0 ]))
     # print(run([1, 1, 0, 0,0,0, 0,0,0,0 ]))
     # print(run([1, 1, 0, 0,0,0, 0,0,0,0 ]))
-
     _,_,_,_, outfile = sampledataset(mpc, run, sampler, experimentname, runtobreak=True, verbose=verbose)
     print("Outfile", outfile)
 
     if showplot:
         x0dataset, Udataset, Xdataset, computetimes = import_dataset(mpc, outfile)
         
-        dimx = 3
-        dimy = 4
+        dimx = 0
+        dimy = 1
         plot_feas(x0dataset[:,dimx],x0dataset[:,dimy])
     
+        dimx = 0
+        dimy = 2
+        plot_feas(x0dataset[:,dimx],x0dataset[:,dimy])
+
     return outfile
 
 
