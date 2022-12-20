@@ -256,8 +256,10 @@ def samplempc(
     #     print(acados_ocp_solver.get(i,'x'))
     #     print(acados_ocp_solver.get(i,'u'))
 
-    xmin = np.array([-5, -5, -10, -5, -5, -7, -math.pi/4, -2*math.pi, -math.pi/4, -2*math.pi]) 
-    xmax = np.array([ 1,  5,  10,  5,  5,  7,  math.pi/4,  2*math.pi,  math.pi/4,  2*math.pi]) 
+    # xmin = np.array([-5, -5, -10, -5, -5, -7, -math.pi/4, -2*math.pi, -math.pi/4, -2*math.pi]) 
+    xmin = np.array([-5, -5, -10, 0,0,0,0,0,0,0]) 
+    # xmax = np.array([ 1,  5,  10,  5,  5,  7,  math.pi/4,  2*math.pi,  math.pi/4,  2*math.pi]) 
+    xmax = np.array([ 1,  5,  10,  0,0,0,0,0,0,0]) 
     umin = np.array([ -math.pi/9, -math.pi/9, -9.8/0.91       ])
     umax = np.array([  math.pi/9,  math.pi/9,  2*9.8-9.8/0.91 ])
     # sampler = RandomSampler(int(100),mpc.nx, 42)

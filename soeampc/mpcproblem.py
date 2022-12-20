@@ -72,7 +72,7 @@ class MPC(ABC):
 
     @property
     def stabilizingfeedbackcontroller(self):
-        """`stabilizingfeedbackcontroller(x)` - evaluates the therminal controller for given state x
+        """`stabilizingfeedbackcontroller(x, v)` - evaluates the therminal controller for given state x and inputs v, returns feedback u
         Default: :code:'None'.
         """
         return self.__stabilizingfeedbackcontroller
