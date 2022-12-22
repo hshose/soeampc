@@ -4,14 +4,14 @@
 #SBATCH --job-name=soeampc_samplempc
 #SBATCH --account=rwth1288
 
-#SBATCH --array=1-50%50
+#SBATCH --array=1-80%80
 
 ### Time your job needs to execute, e. g. 15 min 30 sec
 #SBATCH --time=08:00:00
 
 ### CPUS
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=48
+#SBATCH --cpus-per-task=24
 
 ### File for the output
 #SBATCH --output=/home/hh753317/projects/dsme/soeampc/examples/quadcopter/logs/Cluster.%J.log
