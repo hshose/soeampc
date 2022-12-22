@@ -469,7 +469,7 @@ class MPCQuadraticCostLxLu(MPC):
             print("\t LxLu constraints violated:   ", np.where(constrineq == False))
         return np.all( constrineq )
 
-    def interminalconstraints(self, x, verbose = False, eps = 1e-6, robust=True):
+    def interminalconstraints(self, x, verbose = False, eps = 1e-4, robust=True):
         r = x.T @ self.__P @ x
         if robust:
             alpha = self.__alpha_reduced
@@ -480,7 +480,7 @@ class MPCQuadraticCostLxLu(MPC):
             print("\t Terminal constraint x.T P x = ", r, " <= ", alpha**2, "is violated")
         return constrineq
 
-    def interminalconstraintalpha(self, x, verbose = False, eps = 1e-6):
+    def interminalconstraintalpha(self, x, verbose = False, eps = 1e-4):
         r = x.T @ self.__P @ x
         constrineq = (( r - self.__alpha_reduced**2) <= eps )
         if verbose and not constrineq:

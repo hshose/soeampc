@@ -2,6 +2,7 @@
 
 ### Job name
 #SBATCH --job-name=soeampc_samplempc
+#SBATCH --account=rwth1288
 
 #SBATCH --array=1-50%50
 
@@ -10,7 +11,7 @@
 
 ### CPUS
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=24
+#SBATCH --cpus-per-task=48
 
 ### File for the output
 #SBATCH --output=/home/hh753317/projects/dsme/soeampc/examples/quadcopter/logs/Cluster.%J.log

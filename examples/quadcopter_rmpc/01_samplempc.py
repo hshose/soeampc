@@ -31,7 +31,7 @@ def samplempc(
         verbose=False,
         withstabilizingfeedback=True,
         generate=True,
-        nlpiter=1500
+        nlpiter=400
         ):
 
     print("\n\n===============================================")
@@ -171,8 +171,8 @@ def samplempc(
     ocp.constraints.ug  = np.ones(nconstr)
 
     ocp.constraints.Jsg = np.eye(nconstr)
-    L2_pen = 1e5
-    L1_pen = 1e2
+    L2_pen = 1e6
+    L1_pen = 1e4
     ocp.cost.Zl = L2_pen * np.ones((nconstr,))
     ocp.cost.Zu = L2_pen * np.ones((nconstr,))
     ocp.cost.zl = L1_pen * np.ones((nconstr,))
@@ -255,7 +255,7 @@ def samplempc(
     ocp.solver_options.tf = Tf
     ocp.solver_options.print_level = 0
     ocp.solver_options.nlp_solver_max_iter = nlpiter
-    ocp.solver_options.tol = 1e-9
+    # ocp.solver_options.tol = 1e-9
     # ocp.solver_options.sim_method_num_stages = 6
     # ocp.solver_options.sim_method_newton_iter = 10
     # ocp.solver_options.sim_method_num_steps = 100
