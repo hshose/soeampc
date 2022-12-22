@@ -30,7 +30,7 @@ def sampledataset(mpc, run, sampler, outfile, runtobreak=False, verbose=False):
             if status == 0 or status == 2:
                 if verbose:
                     print("acados status: ", status)
-                if mpc.feasible(X, U, verbose=True):
+                if mpc.feasible(X, U, verbose=verbose, robust=True):
                     X0dataset[Nvalid,:] = x0
                     Xdataset[Nvalid,:,:]  = X
                     Udataset[Nvalid,:,:]  = U

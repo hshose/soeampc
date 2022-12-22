@@ -370,7 +370,7 @@ class MPCQuadraticCostBoxConstr(MPC):
 
 class MPCQuadraticCostLxLu(MPC):
 
-    def __init__(self, f, nx, nu, N, Tf, Q, R, P, alpha, K, Lx, Lu, Kdelta=None):
+    def __init__(self, f, nx, nu, N, Tf, Q, R, P, alpha, K, Lx, Lu, Kdelta=None, alpha_reduced=None, S=None, Ls=None):
         super().__init__()
         super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).N.__set__( self,  N  )
         super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).nx.__set__(self,  nx )
@@ -385,6 +385,13 @@ class MPCQuadraticCostLxLu(MPC):
         self.__Q = Q
         self.__R = R
         self.__K = K
+        self.__S = S
+        self.__Ls = Ls
+
+        if alpha_reduced == None:
+            self.__alpha_reduced = alpha
+        else:
+            self.__alpha_reduced = alpha_reduced
         
         # if no Kdelta is set, this reverts to no stabilizing feedback.
         if isinstance(Kdelta, type(None)):
@@ -452,28 +459,42 @@ class MPCQuadraticCostLxLu(MPC):
     def Kdelta(self):
         return self.__Kdelta
 
-    def instateandinputconstraints(self, X, U, verbose = False, eps = 1e-6):
+    def instateandinputconstraints(self, X, U, verbose = False, eps = 1e-4, robust=False):
         # return np.all((self.__Lx@(X[:-1]).T + self.__Lu@U.T <= 1), axis=0)
-        constrineq = ( self.__Lx@(X[:-1]).T + self.__Lu@U.T - 1 <= eps )
+        if robust:
+            constrineq = ( self.__Lx@(X[:-1]).T + self.__Lu@U.T + self.__Ls@self.__S[:-1].T - 1 <= eps )
+        else:
+            constrineq = ( self.__Lx@(X[:-1]).T + self.__Lu@U.T - 1 <= eps )
         if verbose and not np.all(constrineq):
             print("\t LxLu constraints violated:   ", np.where(constrineq == False))
         return np.all( constrineq )
 
-    def interminalconstraints(self, x, verbose = False, eps = 1e-6):
+    def interminalconstraints(self, x, verbose = False, eps = 1e-6, robust=True):
         r = x.T @ self.__P @ x
-        constrineq = ( r - (self.__alpha**2) <= eps )
+        if robust:
+            alpha = self.__alpha_reduced
+        else:
+            alpha = self.__alpha
+        constrineq = ( r - (alpha**2) <= eps )
         if verbose and not constrineq:
-            print("\t Terminal constraint x.T P x = ", r, " <= ", self.__alpha**2, "is violated")
+            print("\t Terminal constraint x.T P x = ", r, " <= ", alpha**2, "is violated")
         return constrineq
-        
-    def feasible(self,X,U, verbose=False, testinputs=True):
+
+    def interminalconstraintalpha(self, x, verbose = False, eps = 1e-6):
+        r = x.T @ self.__P @ x
+        constrineq = (( r - self.__alpha_reduced**2) <= eps )
+        if verbose and not constrineq:
+            print("\t Terminal constraint x.T P x = ", r, " <= ", self.__alpha_reduced**2, "is violated")
+        return constrineq
+
+    def feasible(self,X,U, verbose=False, testinputs=True, robust=False):
         res = True
-        res = res and self.instateandinputconstraints(X,U)
-        res = res and self.interminalconstraints(X[-1,:])
+        res = res and self.instateandinputconstraints(X,U, robust=robust)
+        res = res and self.interminalconstraints(X[-1,:], robust=robust)
         if verbose and not res:
             print("Infeasible Trajectory")
-            print("\tin state constraint:   ", self.instateandinputconstraints(X, U, verbose=True))
-            print("\tin termial constraint: ", self.interminalconstraints(X[-1,:], verbose=True))
+            print("\tin state constraint:   ", self.instateandinputconstraints(X, U, verbose=True, robust=robust))
+            print("\tin termial constraint: ", self.interminalconstraints(X[-1,:], verbose=True  , robust=robust))
         return res
     
     def cost(self, X, U):

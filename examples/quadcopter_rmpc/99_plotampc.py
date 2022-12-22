@@ -63,10 +63,16 @@ def plotmpc(dataset='latest'):
     # umin = np.array([ -4*math.pi, -4*math.pi, -9.8/0.91       ])
     # umax = np.array([  4*math.pi,  4*math.pi,  2*9.8-9.8/0.91 ])
 
-    xmin = np.array([None, None, None, None,    None, None, -math.pi*20/180,  None, -math.pi*20/180, None]) 
-    xmax = np.array([ 1,  None,  None,  None,  None,  None,  math.pi*20/180,  None,  math.pi*20/180,  None]) 
-    umin = np.array([ -35*math.pi/180, -35*math.pi/180, -9.81/0.91       ])
-    umax = np.array([  35*math.pi/180,  35*math.pi/180,  18-9.81/0.91 ])
+    xmin = np.array([None, None, None, None,    None, None,             1/mpc.Lx[1,6],  None, 1/mpc.Lx[1,6], None]) 
+    xmax = np.array([ 1/mpc.Lx[0,0],  None,  None,  None,  None,  None, 1/mpc.Lx[3,6],  None, 1/mpc.Lx[3,6],  None]) 
+    
+    # nxconstr = (mpc.Lu!=0).argmax(axis=0).min()
+    nxconstr = 5
+    umax = np.array([1/mpc.Lu[nxconstr+i, i] for i in range(3)])
+    umin = np.array([1/mpc.Lu[nxconstr+mpc.nu+i, i] for i in range (3)])
+    
+    # umin = np.array([ -35*math.pi/180, -35*math.pi/180, -9.81/0.91    ])
+    # umax = np.array([  35*math.pi/180,  35*math.pi/180,  18-9.81/0.91 ])
     
 
     limits = {
@@ -76,18 +82,47 @@ def plotmpc(dataset='latest'):
         "umax": umax
     }
 
-    for i in range(X.shape[0]):
+    idxs = []
+    idxs = np.append(idxs, np.argmin(X, axis=0))
+    idxs = np.append(idxs, np.argmin(X, axis=0))
+    idxs = np.append(idxs, np.argmax(np.array([x.T@mpc.Q@x for x in X])))
+
+    idxs = np.array(idxs, dtype=int)
+
+    print("\nshowing points: ", idxs)
+
+    # for i in range(X.shape[0]):
+    for i in idxs:
         x0 = X[i]
         U_MPC = U[i]
+        X_MPC = mpc.forwardsim(x0, U_MPC)
 
         print("x0 =\n",     x0,     "\n")
-        print("U_MPC =\n",  U_MPC,  "\n")
+        print("U_MPC =\n",  np.array([mpc.stabilizingfeedbackcontroller(X_MPC[j], U_MPC[j]) for j in range(U_MPC.shape[0])]),  "\n")
 
-        X_MPC = mpc.forwardsim(x0, U_MPC)
 
         print("forwardsimcheck MPC:",   mpc.feasible(X_MPC, U_MPC,  verbose=True))
 
         plot_quadcopter_ol(mpc,[U_MPC], [X_MPC], labels=['MPC'], limits=limits)
+
+
+def plotV(dataset='latest'):
+    # dataset = "quadcopter_N_100000_20221129-171745"
+
+    mpc = import_mpc(dataset, mpcclass=MPCQuadraticCostLxLu)
+    X, U, _, _ = import_dataset(mpc, dataset)
+    
+    idxs = []
+    idxs.append(np.argmin(X[:,0]))
+    idxs.append(np.argmax(X[:,0]))
+    idxs.append(np.argmin(X[:,1]))
+    idxs.append(np.argmax(X[:,1]))
+    idxs.append(np.argmin(X[:,2]))
+    idxs.append(np.argmax(X[:,2]))
+
+
+    for i in idxs:
+        plot_quadcopter_ol_V(mpc, [U[i]], labels=['MPC'])
 
 
 if __name__=='__main__':

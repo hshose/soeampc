@@ -3,6 +3,33 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
+def plot_quadcopter_ol_V(mpc, Vtraj, labels):
+    plt.clf()
+    N_sim = mpc.N
+    nx = mpc.nx
+
+    Tf = mpc.Tf
+    t = np.linspace(0, mpc.Tf, mpc.N+1)
+
+    Ts = t[1] - t[0]
+
+    Ntrajs = len(Vtraj)
+
+    linestyles = ['solid', 'dotted', 'dashed', 'dashdot']
+    looselydashed = (0, (5, 10))
+    colors = ['r','g','b','c','m','y','k', 'darkred', 'navy', 'darkgreen']
+
+    ulabels = ["u_1", "u_2", "u_3"]
+
+    for i in range(Ntrajs):
+        V = Vtraj[i]
+        for j in range(3):
+            line, = plt.step(t, np.append([V[0,j]], V[:,j]), label=labels[i]+" "+ulabels[j], color=colors[j], linestyle=linestyles[i])
+    plt.grid()
+    plt.ylabel('inputs v')
+    plt.legend(loc=1)
+    plt.show()
+
 def plot_quadcopter_ol(mpc, Utraj, Xtraj, labels, plt_show=True, limits={}):
     # # latexify plot
     # if latexify:
@@ -51,7 +78,7 @@ def plot_quadcopter_ol(mpc, Utraj, Xtraj, labels, plt_show=True, limits={}):
             for j in batch:
                 line, = plt.step(t, np.append([U[0,j]], U[:,j]), label=labels[i]+" "+ulabels[j], color=colors[j], linestyle=linestyles[i])
         plt.grid()
-        plt.title('predicted trajectory')
+        # plt.title('predicted trajectory')
         plt.ylabel('inputs u')
         for j in batch:
             if "umin" in limits and not limits["umin"][j] == None:

@@ -11,18 +11,21 @@ writeout = true
 nx=10;
 nu=3; 
 
-g=9.8;
+g=9.81;
 phivert = [ 0, tan(pi/4)^2;
             tan(pi/4)^2, 0;
             tan(pi/4)^2,tan(pi/4)^2;
             0,0];
 
 
-d0 = 10;
-d1 = 8;
-n0 = 10;
+% d0 = 10;  % Hu parameter
+d0 = 80;    % berkeley parameter
+
+d1 = 8;     % Hu and berkeley
+% n0 = 10;  % Hu parameter
+n0 = 40;    % berkeley parameter
 kT=0.91;
-g = 9.8;
+m = 1.3;    % berkeley parameter
 abl = [-d1, 1, 0, 0;
         -d0, 0, 0, 0;
         0, 0, -d1, 1;
@@ -32,12 +35,12 @@ abl = [-d1, 1, 0, 0;
 con=[];
 % rho_c=0.192;
 % rho_c=0.0802;
-rho_c=0.192*3;
+rho_c=0.192*5;
 Y = sdpvar(nu,nx);
 X = sdpvar(nx);
 % mpc stage cost
-Q = diag([1,1,0.1, 1e-1*ones(1,7)]);
-R = diag([10,10,0.01]);
+Q = diag([20,20,20, 1, 1, 1, 1e-2*ones(1,4)]);
+R = diag([8,8,0.8]);
 e=0;
 
 %% iterate over grid and add lmi constraints
@@ -53,7 +56,7 @@ for i = 1:4
         zeros(4,6), abl ];
     B = [zeros(3,3);
         zeros(2,3);
-        0, 0, kT;
+        0, 0, kT/m;
         0,0,0;
         n0,0,0;
         0,0,0;
@@ -85,7 +88,9 @@ K=Y*P;
 [K_lqr,P_lqr] = lqr(A,B,Q+e*eye(nx),R);
 
 % LQR for initializing MPC
-[K_lqr_init,P_lqr_init] = lqr(A,B,diag([1,1,0.1, 1, 1, 1e-3, 1, 1e-1, 1, 1e-1]),diag([1e-3, 1e-3,1e-3]));
+% [K_lqr_init,P_lqr_init] = lqr(A,B,diag([1,1,0.1, 1, 1, 1e-3, 1, 1e-1, 1, 1e-1]),diag([1e-3, 1e-3,1e-3]));
+% [K_lqr_init,P_lqr_init] = lqr(A,B,diag([1,1,0.1, 1, 1, 1e-3, 1, 1e-1, 1, 1e-1]),diag([1e-3, 1e-3,1e-3]));
+[K_lqr_init,P_lqr_init] = lqr(A,B,Q,R*0.05);
 if writeout
     writematrix(reshape(round(-K_lqr_init,6),1,[]), 'mpc_parameters/Kinit.txt');
 end
@@ -114,11 +119,12 @@ Lx = zeros(11,nx);
 Lu = zeros(11,nu);
 l = ones(11,1);
 
-pxmax = 1;
-phimax = pi/4;
-u12max = pi/9;
+pxmax = 0.145;
+% phimax = pi/2;
+phimax = 20*pi/180;
+u12max = 45*pi/180;
 u3min = -g/kT;
-u3max = 2*g-g/kT;
+u3max = 18-g/kT;
 Lx(1,1) = 1/pxmax;
 Lx(2,7) = 1/phimax;
 Lx(3,9) = 1/phimax;
@@ -187,7 +193,7 @@ Y = sdpvar(nu,nx);
 X = sdpvar(nx);
 
 
-uw = 3e-3*[  1,  1,  1;
+uw = 5e-3*[  1,  1,  1;
              1,  1, -1;
              1, -1,  1;
              1, -1, -1;
@@ -262,7 +268,7 @@ if writeout
 end
 
 alpha_s = norm(sqrtm(P)*inv(sqrtm(Pdelta)));
-Tf = 3
+Tf = 1
 alpha - alpha_s*(1-exp(-rho_c*Tf))/rho_c*wbarmin
 
 if writeout

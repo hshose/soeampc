@@ -31,7 +31,7 @@ def samplempc(
         verbose=False,
         withstabilizingfeedback=True,
         generate=True,
-        nlpiter=1000
+        nlpiter=1500
         ):
 
     print("\n\n===============================================")
@@ -155,7 +155,7 @@ def samplempc(
     # therefore: Lu @ Kdelta @ x + Lu @ v <= 1
     #           |---- Lx ----|
     if withstabilizingfeedback:
-        Lx[nxconstr:nxconstr+nu, :] = Lu[nxconstr:nxconstr+nu]@Kdelta
+        Lx[nxconstr:nxconstr+nu, :]      = Lu[nxconstr:nxconstr+nu]@Kdelta
         Lx[nxconstr+nu:nxconstr+2*nu, :] = Lu[nxconstr+nu:nxconstr+2*nu]@Kdelta
 
     print("Lx = \n", Lx,"\n")
@@ -169,6 +169,14 @@ def samplempc(
     ocp.constraints.D   = Lu
     ocp.constraints.lg  = -100000*np.ones(nconstr)
     ocp.constraints.ug  = np.ones(nconstr)
+
+    ocp.constraints.Jsg = np.eye(nconstr)
+    L2_pen = 1e5
+    L1_pen = 1e2
+    ocp.cost.Zl = L2_pen * np.ones((nconstr,))
+    ocp.cost.Zu = L2_pen * np.ones((nconstr,))
+    ocp.cost.zl = L1_pen * np.ones((nconstr,))
+    ocp.cost.zu = L1_pen * np.ones((nconstr,))
 
     alpha_s = float(np.genfromtxt(fp.joinpath('mpc_parameters','alpha_s.txt'), delimiter=','))
     ocp.constraints.lh_e = np.array([-10000])
@@ -207,13 +215,14 @@ def samplempc(
     # ocp.cost.zu_e = L1_pen * np.ones((1,))
 
     # mpc = MPCQuadraticCostLxLu(f, nx, nu, N, Tf, Q, R, P, alpha_f, K, xmin, xmax, umin, umax, Vx, Vu)
-    mpc = MPCQuadraticCostLxLu( f, nx, nu, N, Tf, Q, R, P, alpha_f, K, Lx, Lu, Kdelta)
+    mpc = MPCQuadraticCostLxLu( f, nx, nu, N, Tf, Q, R, P, alpha_f, K, Lx, Lu, Kdelta, alpha_reduced=alpha, S=Sinit, Ls=Ls)
     mpc.name = model.name
 
     # set options
     ocp.solver_options.qp_solver = 'FULL_CONDENSING_HPIPM' # FULL_CONDENSING_QPOASES
     # ocp.solver_options.qp_solver = 'PARTIAL_CONDENSING_HPIPM' # FULL_CONDENSING_QPOASES
-    # ocp.solver_options.qp_solver = 'PARTIAL_CONDENSING_OSQP' # FULL_CONDENSING_QPOASES
+    # ocp.solver_options.qp_solver = 'FULL_CONDENSING_QPOASES' # FULL_CONDENSING_QPOASES
+    # ocp.solver_options.qp_solver = 'FULL_CONDENSING_DAQP' # FULL_CONDENSING_QPOASES
     # PARTIAL_CONDENSING_HPIPM, FULL_CONDENSING_QPOASES, FULL_CONDENSING_HPIPM,
     # PARTIAL_CONDENSING_QPDUNES, PARTIAL_CONDENSING_OSQP
     ocp.solver_options.hessian_approx = 'GAUSS_NEWTON'
@@ -221,28 +230,30 @@ def samplempc(
 
     ocp.solver_options.integrator_type = 'IRK'
     ocp.solver_options.nlp_solver_type = 'SQP' # SQP_RTI, SQP
-    # ocp.solver_options.levenberg_marquardt = 0.1
+    # ocp.solver_options.
     # ocp.solver_options.regularize_method = 'CONVEXIFY'
     ocp.solver_options.hpipm_mode='ROBUST'
-    ocp.solver_options.qp_solver_iter_max=100
-    ocp.solver_options.qp_tol = 1e-10
-
-
-    # ocp.solver_options.levenberg_marquardt = 1e-1
+    
+    
+    # ocp.solver_options.qp_solver_iter_max=18
+    ocp.solver_options.qp_tol = 1e-8
+    # ocp.solver_options.levenberg_marquardt = 100.0
+    ocp.solver_options.levenberg_marquardt = 20.0
     ocp.solver_options.globalization='MERIT_BACKTRACKING'
     ocp.solver_options.globalization_use_SOC=1
+    ocp.solver_options.line_search_use_sufficient_descent = 1
     ocp.solver_options.alpha_reduction = 0.1
-    ocp.solver_options.alpha_min = 0.001
-    # ocp.solver_options.eps_sufficient_descent = 1e-2
-
-    # ocp.solver_options.regularize_method = 'PROJECT'
+    ocp.solver_options.alpha_min = 0.0001
     ocp.solver_options.regularize_method = 'MIRROR'
 
-    # set prediction horizon
-    ocp.solver_options.tf = Tf
+    # ocp.solver_options.eps_sufficient_descent = 1e-2
+    # ocp.solver_options.regularize_method = 'PROJECT'
 
-    ocp.solver_options.print_level = 0
+    # set prediction horizon
+
     
+    ocp.solver_options.tf = Tf
+    ocp.solver_options.print_level = 0
     ocp.solver_options.nlp_solver_max_iter = nlpiter
     ocp.solver_options.tol = 1e-9
     # ocp.solver_options.sim_method_num_stages = 6
@@ -256,12 +267,18 @@ def samplempc(
     #     print(acados_ocp_solver.get(i,'x'))
     #     print(acados_ocp_solver.get(i,'u'))
 
-    # xmin = np.array([-5, -5, -10, -5, -5, -7, -math.pi/4, -2*math.pi, -math.pi/4, -2*math.pi]) 
-    xmin = np.array([-10, -10, -20, 0,0,0,0,0,0,0]) 
-    # xmax = np.array([ 1,  5,  10,  5,  5,  7,  math.pi/4,  2*math.pi,  math.pi/4,  2*math.pi]) 
-    xmax = np.array([ 1,  10,  20,  0,0,0,0,0,0,0]) 
-    umin = np.array([ -35*math.pi/180, -35*math.pi/180, -9.81/0.91       ])
-    umax = np.array([  35*math.pi/180,  35*math.pi/180,  18-9.81/0.91 ])
+    xmin = np.array([-2.5, -2.5, -3, -3, -5, -5, -math.pi/180*20, -3*math.pi, -math.pi/180*20, -3*math.pi]) 
+    # xmin = np.array([-2, -2, -2, 0,0,0,0,0,0,0]) 
+    xmax = np.array([ 1,  2.5,  2.5,  3,  3,  5,  math.pi/180*20,  3*math.pi,  math.pi/180*20,  3*math.pi]) 
+    # xmax = np.array([ 1,  2,  2,  0,0,0,0,0,0,0]) 
+    
+    umax = np.array([1/Lu[nxconstr+i, i] for i in range(3)])
+    umin = np.array([1/Lu[nxconstr+nu+i, i] for i in range (3)])
+    print("\numin =\n ",umin)
+    print("\numax =\n ",umax)
+    
+    # umin = np.array([ -35*math.pi/180, -35*math.pi/180, -9.81/0.91       ])
+    # umax = np.array([  35*math.pi/180,  35*math.pi/180,  18-9.81/0.91 ])
     # sampler = RandomSampler(int(100),mpc.nx, 42)
     sampler = RandomSampler(numberofsamples, mpc.nx, randomseed, xmin, xmax)
 
@@ -301,7 +318,6 @@ def samplempc(
             # if status == 1 or status == 2 or status == 4:
                 # status = acados_ocp_solver.solve()
 
-
             # if status != 0 or status != 2:
             #     print('acados acados_ocp_solver returned status {}. Exiting.'.format(status))
             #     print(x0)
@@ -324,6 +340,26 @@ def samplempc(
             # print(S)
             computetime = float(acados_ocp_solver.get_stats('time_tot'))
             # print(status)
+
+            ## Always plot initialization condition
+            # if status == 0 or status == 2:
+            #     print("\nx0 =\n",x0)
+            #     print("\nXinit =\n ",Xinit)
+            #     print("\nUinit =\n ",Uinit)
+            #     print("\nfeasible = ",mpc.feasible(Xinit, Uinit, verbose=True))
+            #     print(status)
+            #     plot_quadcopter_ol(mpc,[Uinit, U], [Xinit, X], labels=['INIT', 'ACADOS'])
+
+            ## Plot initialization, whenever it is feasible but acados reports infeasible
+            # if not (status == 0 or status == 2) and mpc.feasible(Xinit, Uinit):
+            #     print("\nx0 =\n",x0)
+            #     print("\nXinit =\n ",Xinit)
+            #     print("\nUinit =\n ",Uinit)
+            #     print("\nfeasible = ",mpc.feasible(Xinit, Uinit, verbose=True))
+            #     acados_ocp_solver.print_statistics()
+            #     print(status)
+            #     plot_quadcopter_ol(mpc,[Uinit, U], [Xinit, X], labels=['INIT', 'ACADOS'])
+
             return X,U, status, computetime
 
     
