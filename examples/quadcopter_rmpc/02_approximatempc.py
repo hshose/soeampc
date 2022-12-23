@@ -25,8 +25,8 @@ def approximatempc(dataset="latest", maxepochs=int(1e6), batchsize=int(1e4)):
 
     # define architectures to be tested
     architectures = np.array([
-        # [mpc.nx, 200, 400, 400, 400, 200, mpc.nu*mpc.N] # achieved mu=0.06
-        [mpc.nx, 200, 400, 600, 800, 600, 400, 200, mpc.nu*mpc.N]
+        [mpc.nx, 200, 400, 600, 600, 400, 200, mpc.nu*mpc.N] # achieved mu=0.06
+        # [mpc.nx, 200, 400, 600, 800, 600, 400, 200, mpc.nu*mpc.N]
         ])
 
     # traverse list until architecture is found
