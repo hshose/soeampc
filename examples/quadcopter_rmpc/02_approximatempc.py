@@ -36,7 +36,7 @@ def approximatempc(dataset="latest", maxepochs=int(1e6), batchsize=int(1e4)):
 
 def retrainampc(datasetname="latest", modelname="latest", maxepochs = 5000, learningrate=1e-3):
     # import latest dataset :-D
-    mpc = import_mpc(datasetname)
+    mpc = import_mpc(datasetname, MPCQuadraticCostLxLu)
     X, Y, _, _ = import_dataset(mpc, datasetname)
     
     # X_test, X_train, Y_test, Y_train = train_test_split(X, U, test_size=0.1, random_state=42)
