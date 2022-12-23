@@ -3,6 +3,7 @@ import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..','..'))
 from pathlib import Path
 import shutil
+from tqdm import tqdm
 
 fp = Path(os.path.dirname(__file__))
 os.chdir(fp)
@@ -29,6 +30,21 @@ import fire
 # quadcopter_N_12000_Docker_20221208-205651_7_20221209-200847
 # quadcopter_N_12000_Docker_20221208-205651_8_20221209-202954
 # quadcopter_N_12000_Docker_20221208-205651_9_20221209-204400
+
+def mergeclusterjobs(arrayjobids):
+    print("\n\n===============================================")
+    print("Merging datasets for arrayjobids"+str(arrayjobids))
+    print("===============================================\n")
+
+    p=Path("datasets")
+    # print([name for name in os.listdir(p)])
+
+    foldernames = [name for name in os.listdir(p) if any(str(ajobid) in name for ajobid in arrayjobids) ] 
+    
+    return mergesamples(foldernames, removeaftermerge=True)
+
+def mergesingleclusterjob(id):
+    return mergeclusterjobs([id])
 
 def mergedocker(now, Nsamples):
     print("\n\n===============================================")
@@ -75,7 +91,7 @@ def mergesamples(foldernames, now=getdatestring(), removeaftermerge=False):
     x0dataset, Udataset, Xdataset, computetimes = import_dataset(mpc, foldernames[0])
     Nsamples = x0dataset.shape[0]
     exporttempfilename = export_dataset(mpc, x0dataset, Udataset, Xdataset, computetimes, mpc.name+"_N_temp_merged_"+str(now), barefilename=True)
-    for f in foldernames[1:]:
+    for f in tqdm(foldernames[1:]):
         print("file:", f)
         x0dataset, Udataset, Xdataset, computetimes = import_dataset(mpc, f)
         Nsamples = Nsamples + x0dataset.shape[0]
