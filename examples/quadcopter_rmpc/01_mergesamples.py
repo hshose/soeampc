@@ -86,7 +86,7 @@ def mergelist():
 
 def mergesamples(foldernames, now=getdatestring(), removeaftermerge=False):
     p=Path("datasets")
-    mpc = import_mpc(foldernames[0])
+    mpc = import_mpc(foldernames[0], MPCQuadraticCostLxLu)
     print("file:", foldernames[0])
     x0dataset, Udataset, Xdataset, computetimes = import_dataset(mpc, foldernames[0])
     Nsamples = x0dataset.shape[0]
