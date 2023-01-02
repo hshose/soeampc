@@ -144,6 +144,10 @@ def samplempc(
     #         x + Lx s <= xmax
     # 1 <= x/xmin - s 
     #      x/xmax + s <= 1
+
+    # we just use one sided ug constraint:
+    # C*x + D*u <= ug
+    # [Lx; Ls]*[x,s] + Lu*u <=1
     
     nxconstr = 5
     nuconstr = 6
@@ -154,8 +158,9 @@ def samplempc(
     Ls = np.reshape(np.genfromtxt(fp.joinpath('mpc_parameters','Ls.txt'), delimiter=','), (1,nconstr)).T
 
     # constrain umin <= Kdelta @ x + v <= umax
-    # the imported Lu is Lx @ x + Lu @ u <= 1
-    # therefore: Lu @ Kdelta @ x + Lu @ v <= 1
+    # the imported Lu is of the form: Lx @ x + Lu @ u <= 1
+    # therefore, the stabilizing feedback term is
+    #            Lu @ Kdelta @ x + Lu @ v <= 1
     #           |---- Lx ----|
     if withstabilizingfeedback:
         Lx[nxconstr:nxconstr+nu, :]      = Lu[nxconstr:nxconstr+nu]@Kdelta
@@ -275,8 +280,8 @@ def samplempc(
     xmax = np.array([ 1,  2.5,  2.5,  3,  3,  5,  math.pi/180*20,  3*math.pi,  math.pi/180*20,  3*math.pi]) 
     # xmax = np.array([ 1,  2,  2,  0,0,0,0,0,0,0]) 
     
-    umax = np.array([1/Lu[nxconstr+i, i] for i in range(3)])
-    umin = np.array([1/Lu[nxconstr+nu+i, i] for i in range (3)])
+    umax = np.array([1/Lu[nxconstr+i, i] for i in range(nu)])
+    umin = np.array([1/Lu[nxconstr+nu+i, i] for i in range(nu)])
     print("\numin =\n ",umin)
     print("\numax =\n ",umax)
     
