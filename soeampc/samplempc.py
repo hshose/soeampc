@@ -41,7 +41,7 @@ def sampledataset(mpc, run, sampler, outfile, runtobreak=False, verbose=False):
                         n += 1
 
             # if verbose:
-                # print("Status",status,"\nforwardsimcheck MPC:", mpc.feasible(X, U, verbose=True),"\n")
+                # print("Status",status,"\nforward_simulate_trajectorycheck MPC:", mpc.feasible(X, U, verbose=True),"\n")
 
             if not runtobreak:
                 pbar.update(1)
@@ -78,7 +78,7 @@ def inspectdataset(mpc, file):
     for i in tqdm(range(Nvalid)):
         x0 = X0dataset[i,:]
         U = Udataset[i,:]
-        allgood = forwardsimcheck(x0, U, c.Tf, c.N)
+        allgood = forward_simulate_trajectorycheck(x0, U, c.Tf, c.N)
         Ngood += allgood
 
     print("Forward sim checks passed:", Ngood/Nvalid*100,"[%]")

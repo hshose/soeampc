@@ -17,10 +17,10 @@ class SafeOnlineEvaluation():
             raise Exception('Invalid mpc value, excpected type MPC')
     
     def evaluate(self,x,U):
-        X = self.mpc.forwardsim(x,U)
+        X = self.mpc.forward_simulate_trajectory(x,U)
         if self.mpc.feasible(X,U) and self.mpc.cost(X,U) <= self.mpc.cost(X_candidate, U_candidate):
                 self.__U_candidate = U
                 self.__X_candidate = X
         u = self.__U_candidate[0]
-        self.__X_candidate, self.__U_candidate = self.mpc.forwardsim(self.__X_candidate, self.__U_candidate)
+        self.__X_candidate, self.__U_candidate = self.mpc.forward_simulate_trajectory(self.__X_candidate, self.__U_candidate)
         return u

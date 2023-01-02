@@ -263,7 +263,7 @@ def statisticaltest(mpc, model, testpoints_X, testpoints_V, p=int(10e3), delta_h
 
     Args:
         mpc:
-            mpc class object, that should implement a method `mpc.forwardsim(x0,V)` and `mpc.feasible(X,V)`
+            mpc class object, that should implement a method `mpc.forward_simulate_trajectory(x0,V)` and `mpc.feasible(X,V)`
         model:
             model class object, that should implement a call operator `model(x0).numpy()`.
             This would typically be a keras / tensorflow model
@@ -295,7 +295,7 @@ def statisticaltest(mpc, model, testpoints_X, testpoints_V, p=int(10e3), delta_h
         V = np.reshape(V, (mpc.N, mpc.nu))
         # for k in range(mpc.nu):
         #     U[k,:] = np.clip(U[k,:], mpc.umin[k], mpc.umax[k])
-        X = mpc.forwardsim(x0,V)
+        X = mpc.forward_simulate_trajectory(x0,V)
         I[j] = mpc.feasible(X,V)
         dist[j] = np.linalg.norm(V-Vtrue, np.inf, 1)
     

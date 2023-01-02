@@ -12,7 +12,7 @@ import errno
 
 __all__ = ['MPC', 'MPCQuadraticCostBoxConstr', 'MPCQuadraticCostLxLu', 'import_mpc']
 
-def checkboxconstraint(series, lower, upper):
+def check_box_constraint(series, lower, upper):
     for s in series:
         if not (all(s<=upper) and all(s>=lower)):
             return False
@@ -29,7 +29,7 @@ class MPC(ABC):
         self.__Tf = None
         self.__f = None
         self.__f_type = None
-        self.__terminalcontroller = None
+        self.__terminal_controller = None
     
     @property
     def name(self):
@@ -69,18 +69,18 @@ class MPC(ABC):
         return self.__f_type
     
     @property
-    def terminalcontroller(self):
-        """`terminalcontroller(x)` - evaluates the therminal controller for given state x
+    def terminal_controller(self):
+        """`terminal_controller(x)` - evaluates the therminal controller for given state x
         Default: :code:'None'.
         """
-        return self.__terminalcontroller
+        return self.__terminal_controller
 
     @property
-    def stabilizingfeedbackcontroller(self):
-        """`stabilizingfeedbackcontroller(x, v)` - evaluates the therminal controller for given state x and inputs v, returns feedback u
+    def stabilizing_feedback_controller(self):
+        """`stabilizing_feedback_controller(x, v)` - evaluates the therminal controller for given state x and inputs v, returns feedback u
         Default: :code:'None'.
         """
-        return self.__stabilizingfeedbackcontroller
+        return self.__stabilizing_feedback_controller
 
     @name.setter
     def name(self, name):
@@ -131,19 +131,19 @@ class MPC(ABC):
             raise Exception('Invalid f_type value, got', f_type, ' which is not in', f_types)       
 
 
-    @terminalcontroller.setter
-    def terminalcontroller(self, terminalcontroller):
-        if callable(terminalcontroller):
-            self.__terminalcontroller = terminalcontroller
+    @terminal_controller.setter
+    def terminal_controller(self, terminal_controller):
+        if callable(terminal_controller):
+            self.__terminal_controller = terminal_controller
         else:
-            raise Exception('Invalid terminalcontroller, must be callable')
+            raise Exception('Invalid terminal_controller, must be callable')
 
-    @stabilizingfeedbackcontroller.setter
-    def stabilizingfeedbackcontroller(self, stabilizingfeedbackcontroller):
-        if callable(stabilizingfeedbackcontroller):
-            self.__stabilizingfeedbackcontroller = stabilizingfeedbackcontroller
+    @stabilizing_feedback_controller.setter
+    def stabilizing_feedback_controller(self, stabilizing_feedback_controller):
+        if callable(stabilizing_feedback_controller):
+            self.__stabilizing_feedback_controller = stabilizing_feedback_controller
         else:
-            raise Exception('Invalid stabilizingfeedbackcontroller, must be callable')
+            raise Exception('Invalid stabilizing_feedback_controller, must be callable')
 
 
     @abstractmethod
@@ -163,19 +163,19 @@ class MPC(ABC):
     def genfromtxt(inpath):
         pass
 
-    def shiftappendterminal(self,X,U):
-        U = np.concatenate((U[1:], self.__terminalcontroller(X[-1])))
-        X = self.forwardsim(X[1], U)
+    def shift_append_terminal(self,X,U):
+        U = np.concatenate((U[1:], self.__terminal_controller(X[-1])))
+        X = self.forward_simulate_trajectory(X[1], U)
         return X,U
 
-    def forwardsim(self,x,U):
+    def forward_simulate_trajectory(self,x,U):
         Ts = self.__Tf/self.__N
         t = np.linspace(0,self.__Tf,self.__N+1)
         if self.f_type == 'CT':
             def f_pwconst_input(y,t,U,Ts):
                     x = y
                     idx = min( int(t/Ts), np.shape(U)[0]-1)
-                    u = self.__stabilizingfeedbackcontroller(x, U[idx,:])
+                    u = self.__stabilizing_feedback_controller(x, U[idx,:])
                     return tuple(self.__f(x, u))
 
             X = odeint(f_pwconst_input, x, t, args=(U, Ts))
@@ -183,13 +183,13 @@ class MPC(ABC):
         else:
             raise Exception('DT not implemented yet')
 
-    def singlestepsim(self,x,u):
+    def forward_simulate_single_step(self,x,u):
         Ts = self.__Tf/self.__N
         t = np.linspace(0,Ts,2)
         if self.f_type == 'CT':
             def f_pwconst_input(y,t):
                     x = y
-                    ustable = self.__stabilizingfeedbackcontroller(x, u)
+                    ustable = self.__stabilizing_feedback_controller(x, u)
                     return tuple(self.__f(x, ustable))
 
             X = odeint(f_pwconst_input, x, t)
@@ -219,7 +219,7 @@ class MPCQuadraticCostBoxConstr(MPC):
         self.__Q = Q
         self.__R = R
         self.__K = K
-        self.__terminalcontroller = lambda x: K@x
+        self.__terminal_controller = lambda x: K@x
 
         # # if no explicit Lx and Lu are supplied, we compute them here...
         # if Lx==None and Lu==None:
@@ -279,26 +279,26 @@ class MPCQuadraticCostBoxConstr(MPC):
     def K(self):
         return self.__K
 
-    def instateconstraints(self, X):
-        return checkboxconstraint(self.__Vx*X, self.__xmin, self.__xmax)
+    def in_state_constraints(self, X):
+        return check_box_constraint(self.__Vx*X, self.__xmin, self.__xmax)
 
-    def ininputconstraints(self, U):
-        return checkboxconstraint(self.__Vu*U, self.__umin, self.__umax)
+    def in_input_constraints(self, U):
+        return check_box_constraint(self.__Vu*U, self.__umin, self.__umax)
 
-    def interminalconstraints(self, x):
+    def in_terminal_constraints(self, x):
         r = x.T @ self.__P @ x
         return r <= self.__alpha
         
     def feasible(self,X,U, verbose=False):
         res = True
-        res = res and self.instateconstraints(X)
-        # res = res and self.ininputconstraints(U)
-        res = res and self.interminalconstraints(X[-1,:])
+        res = res and self.in_state_constraints(X)
+        # res = res and self.in_input_constraints(U)
+        res = res and self.in_terminal_constraints(X[-1,:])
         if verbose and not res:
             print("Infeasible Trajectory")
-            print("\tin state constraint:   ", self.instateconstraints(X))
-            print("\tin input constraint:   ", self.ininputconstraints(U))
-            print("\tin termial constraint: ", self.interminalconstraints(X[-1,:]))
+            print("\tin state constraint:   ", self.in_state_constraints(X))
+            print("\tin input constraint:   ", self.in_input_constraints(U))
+            print("\tin termial constraint: ", self.in_terminal_constraints(X[-1,:]))
         return res
     
     def cost(self, X, U):
@@ -315,7 +315,7 @@ class MPCQuadraticCostBoxConstr(MPC):
         p = outpath
         p.mkdir(parents=True,exist_ok=True)
         with open(p.joinpath('name.txt'), 'w') as file:
-            file.write(mpc.name)
+            file.write(self.name)
 
         np.savetxt(p.joinpath("nx.txt"),    np.array([self.nx]), fmt='%i', delimiter=",")
         np.savetxt(p.joinpath("nu.txt"),    np.array([self.nu]), fmt='%i', delimiter=",")
@@ -406,10 +406,10 @@ class MPCQuadraticCostLxLu(MPC):
         else: 
             raise Exception("Dimension mismatch between Kdelta, nx, and nu!")
     
-        # self.__stabilizingfeedbackcontroller = lambda x,v: self.__Kdelta @ x + v 
-        # self.__terminalcontroller = lambda x: (self.__K-self.__Kdelta) @ x
-        super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).stabilizingfeedbackcontroller.__set__( self,  lambda x,v: self.__Kdelta @ x + v  )
-        super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).terminalcontroller.__set__( self,  lambda x: (self.__K-self.__Kdelta) @ x  )
+        # self.__stabilizing_feedback_controller = lambda x,v: self.__Kdelta @ x + v 
+        # self.__terminal_controller = lambda x: (self.__K-self.__Kdelta) @ x
+        super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).stabilizing_feedback_controller.__set__( self,  lambda x,v: self.__Kdelta @ x + v  )
+        super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).terminal_controller.__set__( self,  lambda x: (self.__K-self.__Kdelta) @ x  )
 
         if Lx.shape[0] == Lu.shape[0] and Lx.shape[1] == self.nx and Lu.shape[1] == self.nu:
             self.__nconstr = Lx.shape[0]
@@ -464,7 +464,7 @@ class MPCQuadraticCostLxLu(MPC):
     def Kdelta(self):
         return self.__Kdelta
 
-    def instateandinputconstraints(self, X, U, verbose = False, eps = 1e-4, robust=False):
+    def in_state_and_input_constraints(self, X, U, verbose = False, eps = 1e-4, robust=False):
         # return np.all((self.__Lx@(X[:-1]).T + self.__Lu@U.T <= 1), axis=0)
         if robust:
             constrineq = ( self.__Lx@(X[:-1]).T + self.__Lu@U.T + self.__Ls@self.__S[:-1].T - 1 <= eps )
@@ -474,7 +474,7 @@ class MPCQuadraticCostLxLu(MPC):
             print("\t LxLu constraints violated:   ", np.where(constrineq == False))
         return np.all( constrineq )
 
-    def interminalconstraints(self, x, verbose = False, eps = 1e-4, robust=True):
+    def in_terminal_constraints(self, x, verbose = False, eps = 1e-4, robust=True):
         r = x.T @ self.__P @ x
         if robust:
             alpha = self.__alpha_reduced
@@ -485,21 +485,14 @@ class MPCQuadraticCostLxLu(MPC):
             print("\t Terminal constraint x.T P x = ", r, " <= ", alpha**2, "is violated")
         return constrineq
 
-    def interminalconstraintalpha(self, x, verbose = False, eps = 1e-4):
-        r = x.T @ self.__P @ x
-        constrineq = (( r - self.__alpha_reduced**2) <= eps )
-        if verbose and not constrineq:
-            print("\t Terminal constraint x.T P x = ", r, " <= ", self.__alpha_reduced**2, "is violated")
-        return constrineq
-
     def feasible(self,X,U, verbose=False, testinputs=True, robust=False):
         res = True
-        res = res and self.instateandinputconstraints(X,U, robust=robust)
-        res = res and self.interminalconstraints(X[-1,:], robust=robust)
+        res = res and self.in_state_and_input_constraints(X,U, robust=robust)
+        res = res and self.in_terminal_constraints(X[-1,:], robust=robust)
         if verbose and not res:
             print("Infeasible Trajectory")
-            print("\tin state constraint:   ", self.instateandinputconstraints(X, U, verbose=True, robust=robust))
-            print("\tin termial constraint: ", self.interminalconstraints(X[-1,:], verbose=True  , robust=robust))
+            print("\tin state constraint:   ", self.in_state_and_input_constraints(X, U, verbose=True, robust=robust))
+            print("\tin termial constraint: ", self.in_terminal_constraints(X[-1,:], verbose=True  , robust=robust))
         return res
     
     def cost(self, X, U):
