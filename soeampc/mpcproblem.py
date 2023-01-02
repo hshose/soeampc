@@ -18,10 +18,6 @@ def checkboxconstraint(series, lower, upper):
             return False
     return True
 
-def import_mpc(file="latest", mpcclass=MPCQuadraticCostBoxConstr):
-    p = Path("datasets").joinpath(file, "parameters")
-    mpc = mpcclass.genfromtxt(p)
-    return mpc
 class MPC(ABC):
     "Dimensions for OCP"
     def __init__(self):
@@ -569,3 +565,8 @@ class MPCQuadraticCostLxLu(MPC):
         with open(p.joinpath('name.txt'), 'r') as file:
             mpc.name = file.read().rstrip()
         return mpc
+
+def import_mpc(file="latest", mpcclass=MPCQuadraticCostBoxConstr):
+    p = Path("datasets").joinpath(file, "parameters")
+    mpc = mpcclass.genfromtxt(p)
+    return mpc

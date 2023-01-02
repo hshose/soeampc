@@ -16,9 +16,12 @@ from pathlib import Path
 fp = Path(os.path.dirname(__file__))
 os.chdir(fp)
 
-from soeampc import RandomSampler, sampledataset, MPCQuadraticCostLxLu, import_dataset
-from dynamics.f import f
+from soeampc.sampler import RandomSampler
+from soeampc.samplempc import sampledataset
+from soeampc.mpcproblem import MPCQuadraticCostLxLu
+# from soeampc.utils import import_dataset
 
+from dynamics.f import f
 from plot import *
 
 import fire
