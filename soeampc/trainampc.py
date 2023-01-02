@@ -150,7 +150,7 @@ def retrainmodel(mpc, model, X, Y, architecturestring, datasetname, batchsize=in
     X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.1, random_state=42)
     print("X[42]", X_train[42])
     model = trainmodel(model=model, X_train=X_train, Y_train=Y_train, datasetname=datasetname, batchsize=batchsize, maxepochs=maxepochs, patience=patience, learning_rate=learning_rate)
-    testresult, mu = statisticaltest(mpc, model, X_test)
+    testresult, mu = statisticaltest(mpc, model, X_test, Y_test)
     date = datetime.now().strftime("%Y%m%d-%H%M%S")
     modelname = architecturestring + '_mu=' + ('%.2f' % mu) + '_' + date
     export_model(model, datasetname, modelname)
@@ -175,7 +175,7 @@ def hyperparametertuning(mpc, X, Y, datasetname, architectures, maxepochs=int(1e
 
         model = trainmodel(model, X_train, Y_train, datasetname, batchsize, maxepochs, patience)
 
-        testresult, mu = statisticaltest(mpc, model, X_test)
+        testresult, mu = statisticaltest(mpc, model, X_test, Y_test)
         date = datetime.now().strftime("%Y%m%d-%H%M%S")
         modelname = '-'.join([str(d) for d in a]) + '_mu=' + ('%.2f' % mu) + '_' + date
         export_model(model, datasetname, modelname)
@@ -184,23 +184,33 @@ def hyperparametertuning(mpc, X, Y, datasetname, architectures, maxepochs=int(1e
     return None
 
 
-def statisticaltest(mpc, model, testpoints, p=int(10e3), Tf=20, Nol=10, delta_h=0.10, mu_crit=0.80):
-    p = min(np.shape(testpoints)[0], p)
+def statisticaltest(mpc, model, testpoints_X, testpoints_V, p=int(10e3), Tf=20, Nol=10, delta_h=0.10, mu_crit=0.80):
+    p = min(np.shape(testpoints_X)[0], p)
     print("\noffline testing on \n\tp = ", p)
     I = np.zeros(p)
+    dist = np.zeros((p,mpc.nu))
     for j in range(p):
-        x0 = testpoints[j, :]
-        U = model(x0).numpy()
-        U = np.reshape(U, (mpc.N, mpc.nu))
+        x0 = testpoints_X[j, :]
+        Vtrue = testpoints_V[j]
+        V = model(x0).numpy()
+        V = np.reshape(V, (mpc.N, mpc.nu))
         # for k in range(mpc.nu):
         #     U[k,:] = np.clip(U[k,:], mpc.umin[k], mpc.umax[k])
-        X = mpc.forwardsim(x0,U)
-        I[j] = mpc.feasible(X,U)
+        X = mpc.forwardsim(x0,V)
+        I[j] = mpc.feasible(X,V)
+        dist[j] = np.linalg.norm(V-Vtrue, np.inf, 1)
     
     mu = np.mean(I)
     print("\t mean(I) =", mu)
     epsilon = math.sqrt(-math.log(delta_h/2)/(2*p))
     print("\t epsilon =", epsilon)
+
+    worst_case_passing_dist = np.max(dist[I==1])
+    best_case_not_passing_dist = np.min(dist[I==0])
+
+    print("\t worst_case_passing_dist =", worst_case_passing_dist)
+    print("\t best_case_not_passing_dist =", best_case_not_passing_dist)
+
     if mu_crit <= mu - epsilon:
         print("test passed\n")
         return True, mu
