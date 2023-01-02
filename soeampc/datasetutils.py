@@ -4,8 +4,6 @@ import os
 import errno
 import numpy as np
 
-import tensorflow.keras as keras
-
 from .mpcproblem import *
 
 def append_to_dataset(mpc, x0dataset, Udataset, Xdataset, computetimes, filename):
@@ -62,20 +60,6 @@ def export_dataset(mpc, x0dataset, Udataset, Xdataset, computetimes, filename, b
             raise e
     return datasetname
 
-def export_model(model, datasetname, modelname):
-    p = Path("models").joinpath(datasetname)
-    model.save(p.joinpath(modelname))
-    link_name=p.joinpath("latest")
-    target=modelname
-    try:
-        os.symlink(target, link_name)
-    except OSError as e:
-        if e.errno == errno.EEXIST:
-            os.remove(link_name)
-            os.symlink(target, link_name)
-        else:
-            raise e
-
 
 def import_dataset(mpc, file="latest"):
 
@@ -92,13 +76,3 @@ def import_dataset(mpc, file="latest"):
 
     return x0dataset, Udataset, Xdataset, computetimes
     
-
-def import_mpc(file="latest", mpcclass=MPCQuadraticCostBoxConstr):
-    p = Path("datasets").joinpath(file, "parameters")
-    mpc = mpcclass.genfromtxt(p)
-    return mpc
-
-def import_model(datasetname="latest", modelname="latest"):
-    p = Path("models").joinpath(datasetname).joinpath(modelname)
-    model = keras.models.load_model(p)
-    return model

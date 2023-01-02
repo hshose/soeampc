@@ -10,10 +10,32 @@ import keras.backend as backend
 from sklearn.model_selection import train_test_split
 
 import math
+
 from pathlib import Path
 from datetime import datetime
+import os
+import errno
 
 from .utils import export_model
+
+def import_model(datasetname="latest", modelname="latest"):
+    p = Path("models").joinpath(datasetname).joinpath(modelname)
+    model = keras.models.load_model(p)
+    return model
+
+def export_model(model, datasetname, modelname):
+    p = Path("models").joinpath(datasetname)
+    model.save(p.joinpath(modelname))
+    link_name=p.joinpath("latest")
+    target=modelname
+    try:
+        os.symlink(target, link_name)
+    except OSError as e:
+        if e.errno == errno.EEXIST:
+            os.remove(link_name)
+            os.symlink(target, link_name)
+        else:
+            raise e
 
 def clipped_mae(y_true, y_pred):
     #   Args:

@@ -5,7 +5,12 @@ from scipy.integrate import odeint
 import importlib
 import inspect
 
-__all__ = ['MPC', 'MPCQuadraticCostBoxConstr', 'MPCQuadraticCostLxLu']
+from pathlib import Path
+from datetime import datetime
+import os
+import errno
+
+__all__ = ['MPC', 'MPCQuadraticCostBoxConstr', 'MPCQuadraticCostLxLu', 'import_mpc']
 
 def checkboxconstraint(series, lower, upper):
     for s in series:
@@ -13,6 +18,10 @@ def checkboxconstraint(series, lower, upper):
             return False
     return True
 
+def import_mpc(file="latest", mpcclass=MPCQuadraticCostBoxConstr):
+    p = Path("datasets").joinpath(file, "parameters")
+    mpc = mpcclass.genfromtxt(p)
+    return mpc
 class MPC(ABC):
     "Dimensions for OCP"
     def __init__(self):
