@@ -3,6 +3,94 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
+def plot_stirtank_ol(mpc, Utraj, Xtraj, labels, plt_show=True, limits={}):
+    # # latexify plot
+    # if latexify:
+    #     params = {'backend': 'ps',
+    #             'text.latex.preamble': r"\usepackage{gensymb} \usepackage{amsmath}",
+    #             'axes.labelsize': 10,
+    #             'axes.titlesize': 10,
+    #             'legend.fontsize': 10,
+    #             'xtick.labelsize': 10,
+    #             'ytick.labelsize': 10,
+    #             'text.usetex': True,
+    #             'font.family': 'serif'
+    #     }
+
+    # matplotlib.rcParams.update(params)
+
+    N_sim = mpc.N
+    nx = mpc.nx
+
+    Tf = mpc.Tf
+    t = np.linspace(0, mpc.Tf, mpc.N+1)
+
+    Ts = t[1] - t[0]
+
+    Ntrajs = len(Utraj)
+
+    linestyles = ['solid', 'dotted', 'dashed', 'dashdot']
+    looselydashed = (0, (5, 10))
+    colors = ['r','g','b','c','m','y','k', 'darkred', 'navy', 'darkgreen']
+
+    xbatches = [[0], [1]]
+    ubatches = [[0]]
+
+    xlabels = ["x_1", "x_2"]
+    ulabels = ["u_1"]
+
+    batches = len(xbatches) + len(ubatches)
+
+    for k in range(len(ubatches)):
+        plt.subplot(batches, 1, k+1)
+        batch = ubatches[k]
+        for i in range(Ntrajs):
+            V = Utraj[i]
+            X = Xtraj[i]
+            U = np.array([mpc.stabilizing_feedback_controller(X[j], V[j]) for j in range(V.shape[0])])
+            for j in batch:
+                line, = plt.step(t, np.append([U[0,j]], U[:,j]), label=labels[i]+" "+ulabels[j], color=colors[j], linestyle=linestyles[i])
+        plt.grid()
+        # plt.title('predicted trajectory')
+        plt.ylabel('inputs u')
+        for j in batch:
+            if "umin" in limits and not limits["umin"][j] == None:
+                plt.hlines(limits["umin"][j], t[0], t[-1], linestyles=looselydashed, color=colors[batch[0]-j], alpha=0.7)
+            if "umax" in limits and not limits["umax"][j] == None:
+                plt.hlines(limits["umax"][j], t[0], t[-1], linestyles=looselydashed, color=colors[batch[0]-j], alpha=0.7)
+        
+        # if "umin" in limits and "umax" in limits:
+        #     plt.ylim([ 
+        #             1.2*np.min([limits["umin"][j] for j in batch if not limits["umin"][j] == None ]),
+        #             1.2*np.max([limits["umax"][j] for j in batch if not limits["umax"][j] == None ])
+        #             ])
+        plt.legend(loc=1)
+
+    for k in range(len(xbatches)):
+        batch = xbatches[k]
+        plt.subplot(batches, 1, len(ubatches)+k+1)
+        for i in range(Ntrajs):
+            X = Xtraj[i]
+            for j in batch:
+                line, = plt.plot(t, X[:, j], label=labels[i]+" "+xlabels[j], color=colors[j], linestyle=linestyles[i])
+        plt.ylabel('$x$')
+        for j in batch:
+            if "xmin" in limits and not limits["xmin"][j] == None:
+                plt.hlines(limits["xmin"][j], t[0], t[-1], linestyles=looselydashed, color=colors[batch[0]-j], alpha=0.7)
+            if "xmax" in limits and not limits["xmax"][j] == None:
+                plt.hlines(limits["xmax"][j], t[0], t[-1], linestyles=looselydashed, color=colors[batch[0]-j], alpha=0.7)       
+        # if "xmin" in limits and "xmax" in limits:
+        #     plt.ylim([ 
+        #             1.2*np.min([limits["xmin"][j] for j in batch if not limits["xmin"][j] == None ]),
+        #             1.2*np.max([limits["xmax"][j] for j in batch if not limits["xmax"][j] == None ])
+        #             ])
+        plt.grid()
+        plt.legend(loc=1)
+
+    plt.subplots_adjust(left=None, bottom=None, right=None, top=None, hspace=0.4)
+    plt.show()
+    # return plt
+
 def plot_stirtank(shooting_nodes, u_max, u_min, x_max, x_min, U, X, Ucomp = [], Xcomp = [], latexify=False, plt_show=True):
     """
     Params:

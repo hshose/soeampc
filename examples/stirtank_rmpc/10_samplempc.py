@@ -2,8 +2,10 @@ from acados_template import AcadosOcp, AcadosOcpSolver, AcadosSimSolver, AcadosM
 from casadi import SX, vertcat, sin, cos, Function, sign, tanh
 import numpy as np
 import scipy.linalg
+from scipy.integrate import odeint
 import math
 
+import subprocess
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..','..'))
@@ -13,15 +15,29 @@ fp = Path(os.path.dirname(__file__))
 os.chdir(fp)
 
 from soeampc.sampler import RandomSampler
-from soeampc.samplempc import sampledataset
+from soeampc.samplempc import sample_dataset_from_mpc
 from soeampc.mpcproblem import MPCQuadraticCostLxLu
+from soeampc.datasetutils import import_dataset, merge_parallel_jobs, get_date_string
 
 from dynamics.f import f
 from plot import *
 
+
 import fire
 
-def samplempc(
+""" Generating a large dataset from stirtank example MPC
+
+This file is used to evaluate the stirtank example rmpc on a random initial conditions.
+The functions `sample_mpc` and `parallel_sample_mpc` can be called using python fire library.
+`sample_mpc` runs single threaded, `parallel_sample_mpc` runs multiple threads
+
+Typical usage example:
+    python3 10_samplempc.py sample_mpc \\
+        --numberofsamples=100
+    python3 10_samplempc.py parallel_sample_mpc
+"""
+
+def sample_mpc(
         showplot=True,
         experimentname="",
         numberofsamples=int(5000),
@@ -29,9 +45,8 @@ def samplempc(
         verbose=False,
         withstabilizingfeedback=True,
         generate=True,
-        nlpiter=400
+        nlpiter=1000
         ):
-
 
     print("\n\n===============================================")
     print("Setting up ACADOS OCP problem")
@@ -71,7 +86,8 @@ def samplempc(
         model.f_impl_expr = f_impl
         # model.f_expl_expr = f_expl
         model.x = x
-        model.xdot = xdot
+        model.x = vertcat(x, s)
+        model.xdot = vertcat(xdot, sdot)
         if withstabilizingfeedback:
             model.u = v
         else:
@@ -110,7 +126,7 @@ def samplempc(
     P_ = scipy.linalg.block_diag(P, 1)
     K = np.reshape(np.genfromtxt(fp.joinpath('mpc_parameters','K.txt'), delimiter=','), (nx, nu)).T
     Kdelta = np.reshape(np.genfromtxt(fp.joinpath('mpc_parameters','Kdelta.txt'), delimiter=','), (nx, nu)).T
-        alpha_f = float(np.genfromtxt(fp.joinpath('mpc_parameters','alpha.txt'), delimiter=','))
+    alpha_f = float(np.genfromtxt(fp.joinpath('mpc_parameters','alpha.txt'), delimiter=','))
 
     ocp.dims.N = N
 
@@ -171,18 +187,18 @@ def samplempc(
     print("C = \n", np.hstack((Lx,Ls)), "\n")
     print("D = \n", Lu, "\n")
 
-    ocp.constraints.C   = Lx
+    ocp.constraints.C   = np.hstack((Lx,Ls))
     ocp.constraints.D   = Lu
     ocp.constraints.lg  = -100000*np.ones(nconstr) # set something very small to deactivate lg
     ocp.constraints.ug  = np.ones(nconstr)
 
-    ocp.constraints.Jsg = np.eye(nconstr)
-    L2_pen = 1e6
-    L1_pen = 1e4
-    ocp.cost.Zl = L2_pen * np.ones((nconstr,))
-    ocp.cost.Zu = L2_pen * np.ones((nconstr,))
-    ocp.cost.zl = L1_pen * np.ones((nconstr,))
-    ocp.cost.zu = L1_pen * np.ones((nconstr,))
+    # ocp.constraints.Jsg = np.eye(nconstr)
+    # L2_pen = 1e3
+    # L1_pen = 1e1
+    # ocp.cost.Zl = L2_pen * np.ones((nconstr,))
+    # ocp.cost.Zu = L2_pen * np.ones((nconstr,))
+    # ocp.cost.zl = L1_pen * np.ones((nconstr,))
+    # ocp.cost.zu = L1_pen * np.ones((nconstr,))
 
 
     ## Terminal set constraint
@@ -206,7 +222,7 @@ def samplempc(
     mpc.name = model.name
 
     # set options
-    ocp.solver_options.qp_solver = 'FULL_CONDENSING_HPIPM' # FULL_CONDENSING_QPOASES
+    ocp.solver_options.qp_solver = 'PARTIAL_CONDENSING_HPIPM' # FULL_CONDENSING_QPOASES
     # ocp.solver_options.qp_solver = 'FULL_CONDENSING_QPOASES' # FULL_CONDENSING_QPOASES
     # PARTIAL_CONDENSING_HPIPM, FULL_CONDENSING_QPOASES, FULL_CONDENSING_HPIPM,
     # PARTIAL_CONDENSING_QPDUNES, PARTIAL_CONDENSING_OSQP
@@ -219,30 +235,42 @@ def samplempc(
     # ocp.solver_options.regularize_method = 'CONVEXIFY'
     ocp.solver_options.hpipm_mode='ROBUST'
 
+    ocp.solver_options.globalization='MERIT_BACKTRACKING'
+    ocp.solver_options.globalization_use_SOC=1
+    ocp.solver_options.line_search_use_sufficient_descent = 1
+    ocp.solver_options.alpha_reduction = 0.1
+    ocp.solver_options.alpha_min = 0.0001
+    ocp.solver_options.regularize_method = 'MIRROR'
+
     # set prediction horizon
     ocp.solver_options.tf = Tf
 
+    # # ocp.solver_options.qp_solver_iter_max=18
+    ocp.solver_options.qp_tol = 1e-8
+    ocp.solver_options.tol = 1e-9
+
     # ocp.solver_options.print_level = 1
-    ocp.solver_options.nlp_solver_max_iter = 1000
-    # ocp.solver_options.sim_method_num_stages = 6
-    ocp.solver_options.sim_method_newton_iter = 10
+    ocp.solver_options.nlp_solver_max_iter = nlpiter
+    ocp.solver_options.sim_method_num_stages = 6
+    # ocp.solver_options.sim_method_newton_iter = 10
     # ocp.solver_options.sim_method_num_steps = 100
 
     if generate:
         acados_ocp_solver = AcadosOcpSolver(ocp, json_file = 'acados_ocp_' + model.name + '.json')
-
+    if numberofsamples <= 0:
+        return
 
     # acados_ocp_solver = AcadosOcpSolver(ocp, json_file = 'acados_ocp_' + model.name + '.json')
 
-    ue      = 0.7853
-    xe1     = 0.2632
-    xe2     = 0.6519
-    umin = np.array([0-ue])
-    umax = np.array([2-ue])
-    xmin = np.array([-0.2,-0.2])
-    xmax = np.array([0.2,0.2])
-    xmin = np.array([1/Lx[i, i] for i in range(nx)])
-    xmax = np.array([1/Lx[nx+i, i] for i in range(nx)])
+    # ue      = 0.7853
+    # xe1     = 0.2632
+    # xe2     = 0.6519
+    # umin = np.array([0-ue])
+    # umax = np.array([2-ue])
+    # xmin = np.array([-0.2,-0.2])
+    # xmax = np.array([0.2,0.2])
+    xmax = np.array([1/Lx[i, i] for i in range(nx)])
+    xmin = np.array([1/Lx[nx+i, i] for i in range(nx)])
     umax = np.array([1/Lu[nxconstr+i, i] for i in range(nu)])
     umin = np.array([1/Lu[nxconstr+nu+i, i] for i in range(nu)])
     print("\nxmin =\n ",xmin)
@@ -255,6 +283,9 @@ def samplempc(
     #     print(acados_ocp_solver.get(i,'x'))
     #     print(acados_ocp_solver.get(i,'u'))
 
+    Kinit = K*100
+    print("\nKinit =\n ",Kinit)
+
     def run(x0):
             # reset to avoid false warmstart
             acados_ocp_solver = AcadosOcpSolver(ocp, json_file = 'acados_ocp_' + model.name + '.json', build = False, generate=False)
@@ -263,24 +294,23 @@ def samplempc(
             acados_ocp_solver.set(0, "lbx", np.append(x0,0))
             acados_ocp_solver.set(0, "ubx", np.append(x0,0))
 
-            Xinit = np.linspace(x0,np.zeros(nx), N+1)
-            Uinit = np.zeros((N,nu))
+            # Xinit = np.linspace(x0, np.zeros(nx), N+1)
+            # Uinit = np.zeros((N,nu))
 
-            Kinit = K
-            for i in range(N):
-                Uinit[i] = Kinit @ Xinit[i]
-                Uinit[i] = np.clip(Uinit[i], umin-Kdelta@Xinit[i], umax-Kdelta@Xinit[i])
-                Xinit[i+1] = mpc.singlestepsim(Xinit[i], Uinit[i])
+            # for i in range(N):
+            #     Uinit[i] = Kinit @ Xinit[i]
+            #     Uinit[i] = np.clip(Uinit[i], umin-Kdelta@Xinit[i], umax-Kdelta@Xinit[i])
+            #     Xinit[i+1] = mpc.forward_simulate_single_step(Xinit[i], Uinit[i])
 
-            if verbose:
-                print("\nx0 =\n",x0)
-                print("\nXinit =\n ",Xinit)
-                print("\nUinit =\n ",Uinit)
-                print("\nfeasible = ",mpc.feasible(Xinit, Uinit, verbose=True))
+            # if verbose:
+            #     print("\nx0 =\n",x0)
+            #     print("\nXinit =\n ",Xinit)
+            #     print("\nUinit =\n ",Uinit)
+            #     print("\nfeasible = ",mpc.feasible(Xinit, Uinit, verbose=True))
 
-            for i in range(N):
-                acados_ocp_solver.set(i, "x", np.append(Xinit[i], Sinit[i]))
-                acados_ocp_solver.set(i, "u", Uinit[i])
+            # for i in range(N):
+            #     acados_ocp_solver.set(i, "x", np.append(Xinit[i], Sinit[i]))
+            #     acados_ocp_solver.set(i, "u", Uinit[i])
 
             status = acados_ocp_solver.solve()
 
@@ -300,32 +330,75 @@ def samplempc(
             S[N] = acados_ocp_solver.get(N, "x")[-1]
             # print(S)
             computetime = float(acados_ocp_solver.get_stats('time_tot'))
+
+            # Always plot initialization condition
+            # if status == 0 or status == 2:
+            #     plot_stirtank_ol(mpc,[U], [X], labels=['INIT'])
+
             return X,U, status, computetime
 
 
     # experimentname = ""
     # samplesperaxis = 1000
 
-    _,_,_,_, outfile = sampledataset(mpc, run, sampler, experimentname, runtobreak=True, verbose=verbose)
+    _,_,_,_, outfile = sample_dataset_from_mpc(mpc, run, sampler, experimentname, verbose=verbose)
     # print("Outfile",outfile)
     # x0dataset, Udataset, Xdataset, computetimes = import_dataset(mpc, outfile)
 
 
     # from plot_stirtank import *
-    # plot_feas(x0dataset,np.array([mpc.xmin[0], mpc.xmax[0]]), np.array([mpc.xmin[1], mpc.xmax[1]]))
 
     if showplot:
         x0dataset, Udataset, Xdataset, computetimes = import_dataset(mpc, outfile)
+        plot_feas(x0dataset,np.array([xmin[0], xmax[0]]), np.array([xmin[1], xmax[1]]))
         
-        dimx = 0
-        dimy = 1
-        plot_feas(x0dataset[:,dimx],x0dataset[:,dimy])
-    
-        dimx = 0
-        dimy = 2
-        plot_feas(x0dataset[:,dimx],x0dataset[:,dimy])
+        # dimx = 0
+        # dimy = 1
+        # plot_feas(x0dataset[:,dimx],x0dataset[:,dimy])
 
     return outfile
 
+def parallel_sample_mpc(instances=16, samplesperinstance=int(1e5), prefix="Cluster"):
+    now = get_date_string()
+    
+    fp = Path(os.path.abspath(os.path.dirname(__file__)))
+    if not fp.joinpath('acados_ocp_stirtank.json').is_file():
+        raise Exception("acados_ocp_stirtank.json does not exist\nplease run `sample_mpc` with `--generate=True` option first")
+
+    print("\n\n===============================================")
+    print("Running", instances, "processes to produce", samplesperinstance, "datapoints each")
+    print("===============================================\n")
+
+    os.chdir(fp)
+    datasetpath = str(fp.joinpath(os.path.abspath(fp),'datasets'))
+    print("datasetpath = ", datasetpath)
+    processes = []
+    parallel_experiments_common_name = prefix+"_"+str(now)+"_"
+    for i in range(instances):
+        # command = ["python3", "01_samplempc.py", "--showplot=False", "--randomseed=None", "--experimentname=Docker_"+str(now)+"_"+str(i)+"_", "--numberofsamples="+str(samplesperinstance)]
+        experimentname = parallel_experiments_common_name+str(i)+"_"
+        command = [
+            "python3",
+            "10_samplempc.py",
+            "sample_mpc",
+            "--showplot=False",
+            "--randomseed=None",        # all processes run with different random seed
+            "--experimentname="+experimentname,
+            "--numberofsamples="+str(samplesperinstance),
+            "--generate=False"]         # don't export acados ocp json (which might cause file access issues in parallel)
+
+        with open(fp.joinpath('logs',experimentname+".log"),"wb") as out:
+            p = subprocess.Popen(command,
+                stdout=out, stderr=out)
+            processes.append(p)
+
+    for p in processes:
+        p.wait()
+
+    merge_parallel_jobs([parallel_experiments_common_name])
+
 if __name__ == "__main__":
-    fire.Fire(samplempc)
+    fire.Fire({
+        'sample_mpc': sample_mpc,
+        'parallel_sample_mpc':parallel_sample_mpc,
+        })

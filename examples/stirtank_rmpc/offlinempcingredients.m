@@ -8,7 +8,13 @@ clc;
 
 addpath('/home/hose/software/casadi')
 import casadi.*
+addpath('dynamics')
 
+writeout = ~( getenv("WRITEOUT") == "");
+if ~writeout
+    disp("WARN: mpc parameters will NOT be written to file")
+    disp("if you want to export, set environemt variable WRITEOUT")
+end
 
 %%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%
@@ -18,17 +24,17 @@ import casadi.*
 %% grid over statespace
 nx=2;nu=1; 
 
-ue      = 0.7853
-xe1     = 0.2632
-xe2     = 0.6519
+ue      = 0.7853;
+xe1     = 0.2632;
+xe2     = 0.6519;
 
 u_min = [0-ue];
 u_max = [2-ue];
 x_min = 0.40*[-0.2,-0.2];
 x_max = -x_min;
 
-x_step = (x_max-x_min)/30
-u_step = (u_max-u_min)/30
+x_step = (x_max-x_min)/10
+u_step = (u_max-u_min)/10
 
 [X1, X2] = ndgrid(x_min:x_step:x_max);
 [U] = ndgrid(u_min:u_step:u_max);
@@ -50,6 +56,7 @@ Bfunc = Function('B', {x,u}, {jacobian(f(x,u), u)});
 %% setup variables for lmi optimization
 con=[];
 rho_c=0.05;
+% rho_c=0.1;
 Y = sdpvar(nu,nx);
 X = sdpvar(nx);
 e = 0.;
@@ -76,7 +83,7 @@ con=[con; X>=0];
 disp('Starting optimization');
 ops = sdpsettings('solver','mosek','verbose',1,'debug',1)
 optimize(con,-log(det(X)), ops) 
-% optimize(con,-trace(X), ops) 
+% optimize(con,-trace(X), ops)
 Y=value(Y);
 X=value(X);
 disp("X")
@@ -143,8 +150,6 @@ disp(idx)
 % disp("maximum omega_R [rpm]")
 % disp(sqrt(norm(inv(sqrtm(P))*[eye(7), K']*L(7,:)')^2*alpha)*60/2/pi)
 
-R = 1e-3
-
 if writeout
     writematrix(reshape(P.',1,[]), 'mpc_parameters//P.txt')
     writematrix(reshape(Q.',1,[]), 'mpc_parameters//Q.txt')
@@ -167,8 +172,8 @@ u_max = [2-ue];
 
 x_min = [-0.2,-0.2]
 x_max = [0.2,0.2]
-x_step = (x_max-x_min)/30
-u_step = (u_max-u_min)/30
+x_step = (x_max-x_min)/10
+u_step = (u_max-u_min)/10
 
 [X1, X2] = ndgrid(x_min:x_step:x_max);
 [U] = ndgrid(u_min:u_step:u_max);
@@ -190,25 +195,26 @@ Bfunc = Function('B', {x,u}, {jacobian(f(x,u), u)});
 %% setup variables for lmi optimization
 con=[];
 c_u=1;
-rho_c=0.05;
+% rho_c=0.05;
+% rho_c=0.05;
 wbar=1;
 Y = sdpvar(nu,nx);
 X = sdpvar(nx);
 e = 0.0;
 % mpc stage cost
-Q = eye(nx);
-R = 1e-1;
+% Q = eye(nx);
+% R = 1e-1;
 
-Lx = [ 1/x_max(1),  0;
-    1/x_min(1),  0;
-    0 1/x_max(2);
-    0 1/x_min(2);
-    zeros(2,2)];
+Lx = [  1/x_max(1),  0;
+        0 1/x_max(2);
+        1/x_min(1),  0;
+        0 1/x_min(2);
+        zeros(2,2)];
 Lu = [ zeros(4,1);
-    1/u_max(1);
-    1/u_min(1)];
+       1/u_max(1);
+       1/u_min(1)];
 
-dw = [0, 0.001;
+dw = [0,  0.001;
       0, -0.001;];
 
 for i = 1:N_xgrid
@@ -268,8 +274,15 @@ if writeout
 end
 
 alpha_s = norm(sqrtm(P)*inv(sqrtm(Pdelta)));
-Tf = 1
-alpha - alpha_s*(1-exp(-rho_c*Tf))/rho_c*wbarmin
+Tf = 20
+alpha_terminal = alpha - alpha_s*(1-exp(-rho_c*Tf))/rho_c*wbarmin;
+
+disp('alpha_terminal')
+disp(alpha_terminal)
+
+if alpha_terminal < 0
+    disp('ERROR: alpha_terminal is negative, MPC problem will always be infeasible')
+end
 
 if writeout
     writematrix(Tf,     'mpc_parameters/Tf.txt')
