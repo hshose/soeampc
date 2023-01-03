@@ -403,7 +403,7 @@ class MPCQuadraticCostLxLu(MPC):
             self.__Kdelta = np.zeros((self.nu, self.nx))
         elif Kdelta.shape[0] == self.nu and Kdelta.shape[1] == self.nx:
             self.__Kdelta = Kdelta
-        else: 
+        else:
             raise Exception("Dimension mismatch between Kdelta, nx, and nu!")
     
         # self.__stabilizing_feedback_controller = lambda x,v: self.__Kdelta @ x + v 
@@ -497,11 +497,12 @@ class MPCQuadraticCostLxLu(MPC):
     
     def cost(self, X, U):
         cost = 0
-        for x in X[:-1]:
-            cost = cost+x@self.__Q@x.T
-        for u in U:
-            cost = cost+u*R*u.T
-        cost = cost+X[-1]@self.__P@X[-1].T
+        for k in range(self.N):
+            x=X[k]
+            v=U[k]
+            u=self.stabilizing_feedback_controller(x, v)
+            cost = cost + x@self.__Q@x.T + u*self.__R*u.T
+        cost = cost+X[self.N+1]@self.__P@X[self.N+1].T
         return cost
     
     def savetxt(self, outpath):
@@ -540,14 +541,14 @@ class MPCQuadraticCostLxLu(MPC):
         Tf = float(np.genfromtxt( p.joinpath( 'Tf.txt'), delimiter=','))
         alpha_f = float(np.genfromtxt( p.joinpath( 'alpha.txt'), delimiter=','))
 
-        Lx = np.genfromtxt( p.joinpath('Lx.txt'),   delimiter=',')
-        Lu = np.genfromtxt( p.joinpath('Lu.txt'),   delimiter=',')
+        Lx = np.genfromtxt( p.joinpath('Lx.txt'),   delimiter=',', ndmin=2)
+        Lu = np.genfromtxt( p.joinpath('Lu.txt'),   delimiter=',', ndmin=2)
 
-        Q = np.genfromtxt( p.joinpath( 'Q.txt' ), delimiter=',')
-        P = np.genfromtxt( p.joinpath( 'P.txt' ), delimiter=',')
-        R = np.genfromtxt( p.joinpath( 'R.txt' ), delimiter=',')
-        K = np.genfromtxt( p.joinpath( 'K.txt' ), delimiter=',')
-        Kdelta = np.genfromtxt( p.joinpath( 'Kdelta.txt' ), delimiter=',')
+        Q = np.genfromtxt( p.joinpath( 'Q.txt' ), delimiter=',', ndmin=2)
+        P = np.genfromtxt( p.joinpath( 'P.txt' ), delimiter=',', ndmin=2)
+        R = np.genfromtxt( p.joinpath( 'R.txt' ), delimiter=',', ndmin=2)
+        K = np.genfromtxt( p.joinpath( 'K.txt' ), delimiter=',', ndmin=2)
+        Kdelta = np.genfromtxt( p.joinpath( 'Kdelta.txt' ), delimiter=',', ndmin=2)
         
         spec = importlib.util.spec_from_file_location("f", p.joinpath("f.py"))
         mod = importlib.util.module_from_spec(spec)
