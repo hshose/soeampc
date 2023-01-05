@@ -6,11 +6,8 @@ import importlib
 import inspect
 
 from pathlib import Path
-from datetime import datetime
-import os
-import errno
 
-__all__ = ['MPC', 'MPCQuadraticCostBoxConstr', 'MPCQuadraticCostLxLu', 'import_mpc']
+__all__ = ['MPC', 'MPCQuadraticCostLxLu', 'import_mpc']
 
 def check_box_constraint(series, lower, upper):
     for s in series:
@@ -163,22 +160,17 @@ class MPC(ABC):
     def genfromtxt(inpath):
         pass
 
-    def shift_append_terminal(self,X,U):
-        U = np.concatenate((U[1:], self.__terminal_controller(X[-1])))
-        X = self.forward_simulate_trajectory(X[1], U)
-        return X,U
-
-    def forward_simulate_trajectory(self,x,U):
+    def forward_simulate_trajectory(self,x,V):
         Ts = self.__Tf/self.__N
         t = np.linspace(0,self.__Tf,self.__N+1)
         if self.f_type == 'CT':
-            def f_pwconst_input(y,t,U,Ts):
+            def f_pwconst_input(y,t,V,Ts):
                     x = y
-                    idx = min( int(t/Ts), np.shape(U)[0]-1)
-                    u = self.__stabilizing_feedback_controller(x, U[idx,:])
+                    idx = min( int(t/Ts), np.shape(V)[0]-1)
+                    u = self.__stabilizing_feedback_controller(x, V[idx])
                     return tuple(self.__f(x, u))
 
-            X = odeint(f_pwconst_input, x, t, args=(U, Ts))
+            X = odeint(f_pwconst_input, x, t, args=(V, Ts))
             return X
         else:
             raise Exception('DT not implemented yet')
@@ -201,12 +193,12 @@ class MPCQuadraticCostLxLu(MPC):
 
     def __init__(self, f, nx, nu, N, Tf, Q, R, P, alpha, K, Lx, Lu, Kdelta=None, alpha_reduced=None, S=None, Ls=None):
         super().__init__()
-        super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).N.__set__( self,  N  )
-        super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).nx.__set__(self,  nx )
-        super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).nu.__set__(self,  nu )
-        super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).Tf.__set__(self,  Tf )
-        super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).f.__set__( self,  f  )
-        super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).f_type.__set__( self,  'CT'  )
+        super(MPCQuadraticCostLxLu,MPCQuadraticCostLxLu).N.__set__( self,  N  )
+        super(MPCQuadraticCostLxLu,MPCQuadraticCostLxLu).nx.__set__(self,  nx )
+        super(MPCQuadraticCostLxLu,MPCQuadraticCostLxLu).nu.__set__(self,  nu )
+        super(MPCQuadraticCostLxLu,MPCQuadraticCostLxLu).Tf.__set__(self,  Tf )
+        super(MPCQuadraticCostLxLu,MPCQuadraticCostLxLu).f.__set__( self,  f  )
+        super(MPCQuadraticCostLxLu,MPCQuadraticCostLxLu).f_type.__set__( self,  'CT'  )
 
 
         self.__P = P
@@ -232,8 +224,8 @@ class MPCQuadraticCostLxLu(MPC):
     
         # self.__stabilizing_feedback_controller = lambda x,v: self.__Kdelta @ x + v 
         # self.__terminal_controller = lambda x: (self.__K-self.__Kdelta) @ x
-        super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).stabilizing_feedback_controller.__set__( self,  lambda x,v: self.__Kdelta @ x + v  )
-        super(MPCQuadraticCostBoxConstr,MPCQuadraticCostBoxConstr).terminal_controller.__set__( self,  lambda x: (self.__K-self.__Kdelta) @ x  )
+        super(MPCQuadraticCostLxLu,MPCQuadraticCostLxLu).stabilizing_feedback_controller.__set__( self,  lambda x,v: self.__Kdelta @ x + v  )
+        super(MPCQuadraticCostLxLu,MPCQuadraticCostLxLu).terminal_controller.__set__( self,  lambda x: (self.__K-self.__Kdelta) @ x  )
 
         if Lx.shape[0] == Lu.shape[0] and Lx.shape[1] == self.nx and Lu.shape[1] == self.nu:
             self.__nconstr = Lx.shape[0]
@@ -242,6 +234,9 @@ class MPCQuadraticCostLxLu(MPC):
         else:
             raise Exception("Dimensions mismatch between Lx, Lu, nx, and nu")
         
+        self.__umin = 1/np.min(self.Lu, 0) # possibly crude / wrong if not box constraints!!!
+        self.__umax = 1/np.max(self.Lu, 0) # possibly crude / wrong if not box constraints!!!
+
         # # if no explicit Lx and Lu are supplied, we compute them here...
         # if Lx==None and Lu==None:
         #     self.__Lx = np.vstack((np.diag(1/xmax), np.diag(1/xmin)))
@@ -288,14 +283,24 @@ class MPCQuadraticCostLxLu(MPC):
     def Kdelta(self):
         return self.__Kdelta
 
-    def in_state_and_input_constraints(self, X, U, verbose = False, eps = 1e-4, robust=False):
+    def in_state_and_input_constraints(self, X, U, verbose = False, eps = 1e-4, robust=False, only_states=True):
         # return np.all((self.__Lx@(X[:-1]).T + self.__Lu@U.T <= 1), axis=0)
-        if robust:
-            constrineq = ( self.__Lx@(X[:-1]).T + self.__Lu@U.T + self.__Ls@self.__S[:-1].T - 1 <= eps )
+        if only_states:
+            Lx = self.__Lx[ np.all(self.__Lu==0,axis=1) ]
+            Lu = self.__Lu[ np.all(self.__Lu==0,axis=1) ]
         else:
-            constrineq = ( self.__Lx@(X[:-1]).T + self.__Lu@U.T - 1 <= eps )
+            Lx = self.__Lx
+            Lu = self.__Lu
+
+        if robust:
+            constrineq = ( Lx@(X[:-1]).T + Lu@U.T + self.__Ls@self.__S[:-1].T - 1 <= eps )
+        else:
+            constrineq = ( Lx@(X[:-1]).T + Lu@U.T - 1 <= eps )
+
         if verbose and not np.all(constrineq):
+            # print(X,U)
             print("\t LxLu constraints violated:   ", np.where(constrineq == False))
+            print("constr ineq = ", constrineq)
         return np.all( constrineq )
 
     def in_terminal_constraints(self, x, verbose = False, eps = 1e-4, robust=True):
@@ -309,24 +314,43 @@ class MPCQuadraticCostLxLu(MPC):
             print("\t Terminal constraint x.T P x = ", r, " <= ", alpha**2, "is violated")
         return constrineq
 
-    def feasible(self,X,U, verbose=False, testinputs=True, robust=False):
+    def feasible(self,X,U, verbose=False, only_states=True, robust=False):
         res = True
-        res = res and self.in_state_and_input_constraints(X,U, robust=robust)
-        res = res and self.in_terminal_constraints(X[-1,:], robust=robust)
+        res = res and self.in_state_and_input_constraints(X,U, robust=robust, only_states=only_states)
+        res = res and self.in_terminal_constraints(X[-1,:],    robust=robust)
         if verbose and not res:
             print("Infeasible Trajectory")
-            print("\tin state constraint:   ", self.in_state_and_input_constraints(X, U, verbose=True, robust=robust))
+            print("\tin state constraint:   ", self.in_state_and_input_constraints(X, U, verbose=True, robust=robust, only_states=only_states))
             print("\tin termial constraint: ", self.in_terminal_constraints(X[-1,:], verbose=True  , robust=robust))
         return res
     
-    def cost(self, X, U):
+    def forward_simulate_trajectory_clipped_inputs(self, x, V):
+        Ts = self.Tf/self.N
+        t = np.linspace(0,self.Tf,self.N+1)
+        if self.f_type == 'CT':
+            def f_pwconst_input(y,t,V,Ts):
+                    x = y
+                    idx = min( int(t/Ts), np.shape(V)[0]-1)
+                    u = np.clip(self.stabilizing_feedback_controller(x, V[idx,:]), self.__umin, self.__umax)
+                    return tuple(self.f(x, u))
+
+            X = odeint(f_pwconst_input, x, t, args=(V, Ts))
+            return X
+        else:
+            raise Exception('DT not implemented yet')
+
+    def cost(self, X, U, clipped_inputs=True):
         cost = 0
         for k in range(self.N):
-            x=X[k]
-            v=U[k]
-            u=self.stabilizing_feedback_controller(x, v)
+            x = X[k]
+            v = U[k]
+            if clipped_inputs:
+                u = np.clip(self.stabilizing_feedback_controller(x, v), self.__umin, self.__umax)
+            else:
+                u = self.stabilizing_feedback_controller(x, V[idx,:])    
             cost = cost + x@self.__Q@x.T + u*self.__R*u.T
-        cost = cost+X[self.N+1]@self.__P@X[self.N+1].T
+        
+        cost = cost+X[self.N]@self.__P@X[self.N].T
         return cost
     
     def savetxt(self, outpath):
@@ -384,7 +408,7 @@ class MPCQuadraticCostLxLu(MPC):
             mpc.name = file.read().rstrip()
         return mpc
 
-def import_mpc(file="latest", mpcclass=MPCQuadraticCostBoxConstr):
+def import_mpc(file="latest", mpcclass=MPCQuadraticCostLxLu):
     p = Path("datasets").joinpath(file, "parameters")
     mpc = mpcclass.genfromtxt(p)
     return mpc
