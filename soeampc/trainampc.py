@@ -16,19 +16,17 @@ from datetime import datetime
 import os
 import errno
 
-from .datasetutils import export_model
-
-def import_model(dataset_name="latest", modelname="latest"):
+def import_model(modelname="latest"):
     """imports tensorflow keras model    
     """
-    p = Path("models").joinpath(dataset_name).joinpath(modelname)
+    p = Path("models").joinpath(modelname)
     model = keras.models.load_model(p)
     return model
 
-def export_model(model, dataset_name, modelname):
+def export_model(model, modelname):
     """exports tensorflow keras model
     """
-    p = Path("models").joinpath(dataset_name)
+    p = Path("models")
     model.save(p.joinpath(modelname))
     link_name=p.joinpath("latest")
     target=modelname
@@ -142,7 +140,7 @@ def generate_model(traindata, architecture, output_shape):
 
     return model
 
-def train_model(model, X_train, Y_train, dataset_name, batch_size=int(1e4), max_epochs=int(1e3), patience=int(1e3), learning_rate=1e-3):
+def train_model(model, X_train, Y_train, batch_size=int(1e4), max_epochs=int(1e3), patience=int(1e3), learning_rate=1e-3):
     """trains a given model on X,Y dataset
 
     Args:
@@ -152,8 +150,6 @@ def train_model(model, X_train, Y_train, dataset_name, batch_size=int(1e4), max_
             training data of initial conditions x0
         Y_train:
             training data of predicted input sequences
-        dataset_name:
-            used for saving the model with name it has been trained on
         batch_size:
             batch size used for learning
         max_epochs:
@@ -170,7 +166,7 @@ def train_model(model, X_train, Y_train, dataset_name, batch_size=int(1e4), max_
 
     overfitCallback = EarlyStopping(monitor='loss', min_delta=0, patience = patience)
 
-    checkpoint_filepath = Path("models").joinpath(dataset_name, "checkpoint")
+    checkpoint_filepath = Path("models").joinpath("checkpoint")
     model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
         filepath=checkpoint_filepath,
         verbose=1,
@@ -191,7 +187,7 @@ def train_model(model, X_train, Y_train, dataset_name, batch_size=int(1e4), max_
     
     return model
 
-def retrain_model(mpc, model, X, Y, architecture_string, dataset_name, batch_size=int(1e4), max_epochs=int(1e3), patience=int(1e3), learning_rate=1e-3):
+def retrain_model(mpc, model, X, Y, architecture_string, batch_size=int(1e4), max_epochs=int(1e3), patience=int(1e3), learning_rate=1e-3):
     """retrains a given model on X, Y dataset
     
     Args:
@@ -205,8 +201,6 @@ def retrain_model(mpc, model, X, Y, architecture_string, dataset_name, batch_siz
             input sequences corresponding to initial conditions x0
         architecture_string:
             string used for model saving
-        dataset_name:
-            string used for dataset saving
         batch_size:
             batch size used for learning
         max_epochs:
@@ -220,18 +214,39 @@ def retrain_model(mpc, model, X, Y, architecture_string, dataset_name, batch_siz
     """
     X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.1, random_state=42)
     print("X[42]", X_train[42])
-    model = train_model(model=model, X_train=X_train, Y_train=Y_train, dataset_name=dataset_name, batch_size=batch_size, max_epochs=max_epochs, patience=patience, learning_rate=learning_rate)
-    testresult, mu = statisticaltest(mpc, model, X_test, Y_test)
+    model = train_model(model=model, X_train=X_train, Y_train=Y_train, batch_size=batch_size, max_epochs=max_epochs, patience=patience, learning_rate=learning_rate)
+    testresult, mu = statistical_test(mpc, model, X_test, Y_test)
     date = datetime.now().strftime("%Y%m%d-%H%M%S")
     modelname = architecture_string + '_mu=' + ('%.2f' % mu) + '_' + date
-    export_model(model, dataset_name, modelname)
+    export_model(model, modelname)
     return model
 
-def hyperparametertuning(mpc, X, Y, dataset_name, architectures, max_epochs=int(1e5), patience=int(1e3), batch_size=int(1e4)):
-    print("\nperforming hyperparameter tuning\n")
+def architecture_search(mpc, X, Y, architectures, hyperparameters, mu_crit=0.6, p_testpoints=int(10e3)):
+    """Crude search for "good enough" approximator for predicting Y from X
+
+    The list of architectures is traversed until a model achieves at least the desired mu_crit.
+    The hyperparameter list is traversed for each architecture, this can be used to manually schedule a decaying learning rate. The statistical_test function is invoced after each hyperparemter dict from the list and the result is saved to disc.
+    The function returns the first architecture from the list, that achieves mu_crit.
+
+    Args:
+        mpc:
+            instance of mpc class
+        X:
+            array of initial conditions x0
+        Y: 
+            array of corresponding predicted input sequences
+        architectures:
+            array of archictetures, each architecture is an array of layer widths, e.g. `architectures=np.array([[mpc.nx, 10, mpc.nu*mpc.N],[mpc.nx, 20, mpc.nu*mpc.N]])`
+        hyperperameters:
+            array of dicts with keys "learning_rates", "patience", "max_epochs" and "batch_size"
+
+    Returns:
+        tensorflow keras model that achieves mu_crit or None, if no model achieves mu_crit.        
+    """
+    print("\nperforming architecture search\n")
     X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.1, random_state=42)
     output_shape=Y_train.shape[1:]
-    p = Path("models").joinpath(dataset_name)
+    p = Path("models")
     p.mkdir(parents=True,exist_ok=True)
     for a in architectures:
         if a[0] != mpc.nx:
@@ -241,25 +256,33 @@ def hyperparametertuning(mpc, X, Y, dataset_name, architectures, max_epochs=int(
         print("\n\n===============================================")
         print("Training Model",a)
         print("===============================================\n")
-        model = generatemodel(X_train, a, output_shape)
+        model = generate_model(X_train, a, output_shape)
         model.summary()
 
-        model = train_model(model, X_train, Y_train, dataset_name, batch_size, max_epochs, patience)
-
-        testresult, mu = statisticaltest(mpc, model, X_test, Y_test)
-        date = datetime.now().strftime("%Y%m%d-%H%M%S")
-        modelname = '-'.join([str(d) for d in a]) + '_mu=' + ('%.2f' % mu) + '_' + date
-        export_model(model, dataset_name, modelname)
+        for hp in hyperparameters:
+            print("training with hyperparameters:",hp)
+            model = train_model(
+                model, X_train,
+                Y_train,
+                batch_size=hp["batch_size"],
+                max_epochs=hp["max_epochs"],
+                patience=hp["patience"],
+                learning_rate=hp["learning_rate"])
+            testresult, mu = statistical_test(mpc, model, X_test, Y_test, p=p_testpoints, mu_crit=mu_crit)
+            date = datetime.now().strftime("%Y%m%d-%H%M%S")
+            modelname = '-'.join([str(d) for d in a]) + '_mu=' + ('%.2f' % mu) + '_' + date
+            export_model(model, modelname)
         if testresult:
             return model
     return None
 
 
-def statisticaltest(mpc, model, testpoints_X, testpoints_V, p=int(10e3), delta_h=0.10, mu_crit=0.80):
-    """Tests if model yields a yields a feasible solution to mpc in mu_crit fraction of testpoints_X
+def statistical_test(mpc, model, testpoints_X, testpoints_V, p=int(10e3), delta_h=0.10, mu_crit=0.80):
+    """Tests if model yields a yields a feasible solution to mpc in mu_crit fraction of feasible set
     
-    Uses Hoeffdings inequality on indicator function I. If I(x0) = 1 iff model(x0) is a feasible solution to mpc problem.
+    Uses Hoeffdings inequality on indicator function I. If I(x0) = 1 iff model(x0) is a feasible solution to mpc problem. testpoints_X should be iid samples from feasible set of mpc.
     mean(I) is compared to mu_crit using Hoeffdings inequality with confidence level delta_h.
+    If the test is successfully passed, the model will yield a feasible solution to the mpc problem for an initial condition x0 drawn randomly from the feasible set of the mpc, in at least mu_crit percent of cases with a confidence level delta_h.
 
     Args:
         mpc:
@@ -286,21 +309,29 @@ def statisticaltest(mpc, model, testpoints_X, testpoints_V, p=int(10e3), delta_h
     """
     p = min(np.shape(testpoints_X)[0], p)
     print("\noffline testing on \n\tp = ", p)
+
     I = np.zeros(p)
     dist = np.zeros((p,mpc.nu))
+    
     for j in range(p):
+        
         x0 = testpoints_X[j, :]
         Vtrue = testpoints_V[j]
+
         V = model(x0).numpy()
         V = np.reshape(V, (mpc.N, mpc.nu))
+        
         # for k in range(mpc.nu):
         #     U[k,:] = np.clip(U[k,:], mpc.umin[k], mpc.umax[k])
-        X = mpc.forward_simulate_trajectory(x0,V)
-        I[j] = mpc.feasible(X,V)
-        dist[j] = np.linalg.norm(V-Vtrue, np.inf, 1)
+        
+        X = mpc.forward_simulate_trajectory_clipped_inputs(x0,V)
+        I[j] = mpc.feasible(X,V, only_states=True)
+        
+        dist[j] = np.linalg.norm(V-Vtrue, np.inf, 0)
     
     mu = np.mean(I)
     print("\t mean(I) =", mu)
+    
     epsilon = math.sqrt(-math.log(delta_h/2)/(2*p))
     print("\t epsilon =", epsilon)
 
@@ -316,8 +347,8 @@ def statisticaltest(mpc, model, testpoints_X, testpoints_V, p=int(10e3), delta_h
     print("test failed for mu_crit <= mu - epsilon with", mu_crit, "!<=", mu-epsilon,"\n")
     return False, mu
 
-def teststatisticaltest(X,Y):
+def teststatistical_test(X,Y):
     X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
     model = keras.models.load_model('models/latest')
-    if statisticaltest(model, X_test):
+    if statistical_test(model, X_test):
         return model
