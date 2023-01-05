@@ -394,8 +394,7 @@ def parallel_sample_mpc(instances=16, samplesperinstance=int(1e5), prefix="Clust
     for p in processes:
         p.wait()
 
-    merge_parallel_jobs([parallel_experiments_common_name])
-
+    merge_parallel_jobs([parallel_experiments_common_name], new_dataset_name=parallel_experiments_common_name[:-1])
 if __name__ == "__main__":
     fire.Fire({
         'sample_mpc': sample_mpc,

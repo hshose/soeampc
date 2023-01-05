@@ -106,7 +106,7 @@ def mergesamples(folder_names, new_dataset_name=get_date_string(), remove_after_
 
     return exportfilename
 
-def merge_parallel_jobs(merge_list):
+def merge_parallel_jobs(merge_list, new_dataset_name=""):
     """merges datasets matching merge_list into single dataset    
     """
     print("\n\n===============================================")
@@ -118,7 +118,7 @@ def merge_parallel_jobs(merge_list):
 
     merge_folders = [folder_name for folder_name in os.listdir(path) if any(str(dataset_name) in folder_name for dataset_name in merge_list) ] 
     
-    return mergesamples(merge_folders, remove_after_merge=True)
+    return mergesamples(merge_folders, new_dataset_name=new_dataset_name, remove_after_merge=True)
 
 def merge_single_parallel_job(dataset_names):
     return merge_parallel_jobs([dataset_names])
