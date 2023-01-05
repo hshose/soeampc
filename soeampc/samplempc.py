@@ -4,17 +4,36 @@ from tqdm import tqdm
 from .datasetutils import export_dataset
 
 
-def sampledataset(mpc, run, sampler, outfile, runtobreak=False, verbose=False):
-    """
+def sample_dataset_from_mpc(mpc, run, sampler, outfile, verbose=False):
+    """evaluates the run function of mpc for points provided by sampler and exports the generated dataset
 
-    """
-    # grid over statespace
-    res = np.empty((0,2), float)
-    
+    Args:
+        mpc:
+            mpc class instance
+        run:
+            function that takes an initial condition x0 and evaluates the mpc.
+            run returns tuple (X, U, status, computetime),
+            with X predicted trajectory of shape (mpc.N+1, mpc.nx),
+            U predicted sequence of shape (mpc.N, mpc.nu),
+            status is acados status (0: success, 2: max iter)
+        sampler:
+            sampler class instance
+        outfile:
+            path to output
+        verbose:
+            prints extra info
+    Returns:
+        tuple (`x0`, `U`, `X`, `ct`, `name`), where `x0` is array of initial states shape (`Nsamples`, `mpc.nx`),
+            `U` is array of input sequences shape (`Nsamples`, `mpc.N`, `mpc.nu`) or sequences `V` such that `U = Kdelta @ X + V`,
+            `X` is an array of predicted state sequence when applying `U` from `x0` shape (`Nsamples`,`mpc.N+1`, `mpc.nx`)
+            `ct` is an array of solver times for each mpc problem, `names` is the path to where the dataset was saved.
+    """  
     X0dataset = np.empty((sampler.Nsamples, mpc.nx), float)
     Xdataset =  np.empty((sampler.Nsamples, mpc.N+1, mpc.nx), float)
     Udataset =  np.empty((sampler.Nsamples, mpc.N, mpc.nu), float)
     computetimes = np.empty(sampler.Nsamples, float)
+
+    runtobreak = True
 
     print("\n\n===============================================")
     print("Evaluating MPC on grid with",sampler.Nsamples,"points")
@@ -30,7 +49,7 @@ def sampledataset(mpc, run, sampler, outfile, runtobreak=False, verbose=False):
             if status == 0 or status == 2:
                 if verbose:
                     print("acados status: ", status)
-                if mpc.feasible(X, U, verbose=verbose, robust=True):
+                if mpc.feasible(X, U, verbose=verbose, robust=True, only_states=False):
                     X0dataset[Nvalid,:] = x0
                     Xdataset[Nvalid,:,:]  = X
                     Udataset[Nvalid,:,:]  = U
