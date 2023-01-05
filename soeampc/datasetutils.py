@@ -3,6 +3,9 @@ from datetime import datetime
 import os
 import errno
 import numpy as np
+import shutil
+
+from tqdm import tqdm
 
 from .mpcproblem import *
 
@@ -23,11 +26,11 @@ def append_to_dataset(mpc, x0dataset, Udataset, Xdataset, computetimes, filename
     np.savetxt(f,  computetimes, delimiter=",")
     f.close()
 
-def getdatestring():
+def get_date_string():
     return datetime.now().strftime("%Y%m%d-%H%M%S")
 
 def export_dataset(mpc, x0dataset, Udataset, Xdataset, computetimes, filename, barefilename=False):    
-    date = getdatestring()
+    date = get_date_string()
     Nsamples = np.shape(x0dataset)[0]
 
     # print("\nExporting Dataset with Nvalid",Nsamples,"feasible samples\n")
@@ -75,4 +78,47 @@ def import_dataset(mpc, file="latest"):
     Xdataset  =  Xraw.reshape(  Nsamples,   mpc.N+1, mpc.nx)
 
     return x0dataset, Udataset, Xdataset, computetimes
+
+def mergesamples(folder_names, new_dataset_name=get_date_string(), remove_after_merge=False):
+    p=Path("datasets")
+    mpc = import_mpc(folder_names[0], MPCQuadraticCostLxLu)
+    print("file:", folder_names[0])
+    x0dataset, Udataset, Xdataset, computetimes = import_dataset(mpc, folder_names[0])
+    Nsamples = x0dataset.shape[0]
+    exporttempfilename = export_dataset(mpc, x0dataset, Udataset, Xdataset, computetimes, mpc.name+"_N_temp_merged_"+str(new_dataset_name), barefilename=True)
+    for f in tqdm(folder_names[1:]):
+        print("file:", f)
+        x0dataset, Udataset, Xdataset, computetimes = import_dataset(mpc, f)
+        Nsamples = Nsamples + x0dataset.shape[0]
+        append_to_dataset(mpc, x0dataset, Udataset, Xdataset, computetimes, exporttempfilename)
+
+    print("\ncollected a total of ", str(Nsamples), "sample points")
+    exportfilename = mpc.name+"_N_"+str(Nsamples)+"_merged_"+str(new_dataset_name)
+    os.rename(p.joinpath(exporttempfilename), p.joinpath(exportfilename))
+    print("\nExported merged dataset to:\n")
+    print("\t", exportfilename,"\n")
+
+    if remove_after_merge:
+        print("\n\nRemoving Folders:\n")
+        print("\t", folder_names)
+        for f in folder_names:
+            shutil.rmtree(p.joinpath(f), ignore_errors=True)
+
+    return exportfilename
+
+def merge_parallel_jobs(merge_list):
+    """merges datasets matching merge_list into single dataset    
+    """
+    print("\n\n===============================================")
+    print("Merging datasets for arrayjobids"+str(merge_list))
+    print("===============================================\n")
+
+    path=Path("datasets")
+    # print([name for name in os.listdir(p)])
+
+    merge_folders = [folder_name for folder_name in os.listdir(path) if any(str(dataset_name) in folder_name for dataset_name in merge_list) ] 
     
+    return mergesamples(merge_folders, remove_after_merge=True)
+
+def merge_single_parallel_job(dataset_names):
+    return merge_parallel_jobs([dataset_names])
