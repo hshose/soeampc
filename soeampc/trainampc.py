@@ -9,6 +9,8 @@ from keras.callbacks import EarlyStopping
 import keras.backend as backend
 from sklearn.model_selection import train_test_split
 
+from tqdm import tqdm
+
 import math
 
 from pathlib import Path
@@ -313,7 +315,7 @@ def statistical_test(mpc, model, testpoints_X, testpoints_V, p=int(10e3), delta_
     I = np.zeros(p)
     dist = np.zeros((p,mpc.nu))
     
-    for j in range(p):
+    for j in tqdm(range(p)):
         
         x0 = testpoints_X[j, :]
         Vtrue = testpoints_V[j]
