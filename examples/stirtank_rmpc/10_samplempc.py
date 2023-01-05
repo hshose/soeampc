@@ -113,7 +113,6 @@ def sample_mpc(
     nx_ = model.x.size()[0]
     ny = nx_ + nu
     ny_e = nx_
-    alpha_f = float(np.genfromtxt(fp.joinpath('mpc_parameters','alpha.txt'), delimiter=','))
 
     Sinit = odeint(lambda y,t: -rho*y+w_bar, 0, np.linspace(0,Tf,N+1))
     print("Sinit =\n",Sinit,"\n")
