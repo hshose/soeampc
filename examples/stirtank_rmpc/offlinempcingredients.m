@@ -12,6 +12,7 @@ addpath('dynamics')
 
 writeout = ~( getenv("WRITEOUT") == "");
 if ~writeout
+    disp("")
     disp("WARN: mpc parameters will NOT be written to file")
     disp("if you want to export, set environemt variable WRITEOUT")
 end
@@ -28,15 +29,21 @@ ue      = 0.7853;
 xe1     = 0.2632;
 xe2     = 0.6519;
 
+% Tightened X constraints compared to usual example.
+x_max = [0.2, 0.13]
+% x_max = [0.2, 0.2]
+x_min = [-0.2, -0.08]
+% x_min = [-0.2, -0.2]
+
 u_min = [0-ue];
 u_max = [2-ue];
-x_min = 0.40*[-0.2,-0.2];
-x_max = -x_min;
+x_min_grid = 0.20*x_min;
+x_max_grid = 0.20*x_max;
 
-x_step = (x_max-x_min)/10
+x_step = (x_max_grid-x_min_grid)/10
 u_step = (u_max-u_min)/10
 
-[X1, X2] = ndgrid(x_min:x_step:x_max);
+[X1, X2] = ndgrid(x_min_grid:x_step:x_max_grid);
 [U] = ndgrid(u_min:u_step:u_max);
 N_xgrid = numel(X1);
 N_ugrid = numel(U);
@@ -62,7 +69,7 @@ X = sdpvar(nx);
 e = 0.;
 % mpc stage cost
 Q = eye(nx);
-R = 1;
+R = 1e-4;
 
 %% iterate over grid and add lmi constraints
 for i = 1:N_xgrid
@@ -127,9 +134,9 @@ C = zeros(Nz,1);
 C_lqr = zeros(Nz,1);
 rhs = zeros(Nz,1);
 for k=1:Nz
-    C(k) = norm(inv(sqrtm(P))*[eye(nx), K']*L(k,:)')^2;
-    C_lqr(k) = norm(inv(sqrtm(P_lqr))*[eye(nx), -K_lqr']*L(k,:)')^2;
-    rhs(k) = (l(k)-L(k,:)*r)^2;
+    C(k) = norm(inv(sqrtm(P))*[eye(nx), K']*L(k,:)');
+    C_lqr(k) = norm(inv(sqrtm(P_lqr))*[eye(nx), -K_lqr']*L(k,:)');
+    rhs(k) = (l(k)-L(k,:)*r);
 end
 
 res = rhs./C;
@@ -170,8 +177,8 @@ xe2     = 0.6519
 u_min = [0-ue];
 u_max = [2-ue];
 
-x_min = [-0.2,-0.2]
-x_max = [0.2,0.2]
+% x_min = [-0.2,-0.2]
+% x_max = [0.2,0.2]
 x_step = (x_max-x_min)/10
 u_step = (u_max-u_min)/10
 
@@ -262,7 +269,7 @@ end
 
 cj = [];
 for i = 1:size(Lx,1)
-    cj = [cj; norm(Pdelta^-(1/2)*(Lx(i,:)'+Kdelta'*Lu(i,:)'),2)]
+    cj = [cj; norm(Pdelta^-(1/2)*(Lx(i,:)'+Kdelta'*Lu(i,:)'),2)];
 end
 
 c_max = max(cj)
