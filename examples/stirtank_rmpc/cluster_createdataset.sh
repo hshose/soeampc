@@ -23,5 +23,5 @@ cd /home/hh753317/projects/dsme/soeampc/examples/stirtank_rmpc
 
 python3 10_samplempc.py parallel_sample_mpc \
     --instances=24 \
-    --samplesperinstance=1000 \
+    --samplesperinstance=500 \
     --prefix=Cluster_$(date +"%Y_%m_%d_%I_%M_%p")_${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}
