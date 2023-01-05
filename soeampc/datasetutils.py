@@ -120,5 +120,5 @@ def merge_parallel_jobs(merge_list, new_dataset_name=""):
     
     return mergesamples(merge_folders, new_dataset_name=new_dataset_name, remove_after_merge=True)
 
-def merge_single_parallel_job(dataset_names):
-    return merge_parallel_jobs([dataset_names])
+def merge_single_parallel_job(dataset_name):
+    return merge_parallel_jobs([dataset_name], new_dataset_name=dataset_name)
