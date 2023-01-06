@@ -18,7 +18,7 @@ from soeampc.trainampc import architecture_search, retrain_model, test_ampc
 from soeampc.mpcproblem import *
 from soeampc.datasetutils import import_dataset, print_dataset_statistics
 
-def find_approximate_mpc(dataset="latest", maxepochs=int(1e6), batchsize=int(1e4)):
+def find_approximate_mpc(dataset="latest"):
     # import latest dataset :-D
     mpc = import_mpc(dataset, MPCQuadraticCostLxLu)
     X, U, _, _ = import_dataset(mpc, dataset)
