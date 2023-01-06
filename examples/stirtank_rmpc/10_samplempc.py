@@ -17,7 +17,7 @@ os.chdir(fp)
 from soeampc.sampler import RandomSampler
 from soeampc.samplempc import sample_dataset_from_mpc
 from soeampc.mpcproblem import MPCQuadraticCostLxLu
-from soeampc.datasetutils import import_dataset, merge_parallel_jobs, get_date_string, merge_single_parallel_job
+from soeampc.datasetutils import import_dataset, merge_parallel_jobs, get_date_string, merge_single_parallel_job, print_dataset_statistics
 
 from dynamics.f import f
 from plot import *
@@ -395,9 +395,12 @@ def parallel_sample_mpc(instances=16, samplesperinstance=int(1e5), prefix="Clust
         p.wait()
 
     merge_parallel_jobs([parallel_experiments_common_name], new_dataset_name=parallel_experiments_common_name[:-1])
+
+
 if __name__ == "__main__":
     fire.Fire({
         'sample_mpc': sample_mpc,
         'parallel_sample_mpc':parallel_sample_mpc,
         'merge_single_parallel_job':merge_single_parallel_job,
+        'print_dataset_statistics':print_dataset_statistics,
         })
