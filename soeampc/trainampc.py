@@ -118,8 +118,8 @@ def generate_model(traindata, architecture, output_shape):
     #     loss=clipped_mae
     # else:
         # loss='mean_absolute_error'
-    
-    loss='mean_squared_error'
+    loss='mean_absolute_error'
+    # loss='mean_squared_error'
 
     # initial_learning_rate = 0.01
     # lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
