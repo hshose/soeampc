@@ -16,7 +16,7 @@ import fire
 
 from soeampc.trainampc import architecture_search, retrain_model, import_model, statistical_test
 from soeampc.mpcproblem import *
-from soeampc.datasetutils import import_dataset
+from soeampc.datasetutils import import_dataset, compute_time_statistics
 
 def find_approximate_mpc(dataset="latest"):
     # import latest dataset :-D
@@ -58,11 +58,14 @@ def retrain_ampc(dataset="latest", model_name="latest", max_epochs = int(1e3), l
 
 def test_ampc(dataset="latest", model_name="latest", p=int(1e4)):
     mpc = import_mpc(dataset, MPCQuadraticCostLxLu)
-    X, Y, _, _ = import_dataset(mpc, dataset)
+    X, Y, _, mpc_compute_times = import_dataset(mpc, dataset)
+    print("\nmpc compute time statistics:")
+    compute_time_statistics(mpc_compute_times)
     
     # X_test, X_train, Y_test, Y_train = train_test_split(X, U, test_size=0.1, random_state=42)
     model = import_model(modelname=model_name)
     statistical_test(mpc, model, X, Y, p=p)
+
 
 if __name__=="__main__":
     fire.Fire({
