@@ -30,10 +30,10 @@ xe1     = 0.2632;
 xe2     = 0.6519;
 
 % Tightened X constraints compared to usual example.
-x_max = [0.2, 0.13]
-% x_max = [0.2, 0.2]
-x_min = [-0.2, -0.08]
-% x_min = [-0.2, -0.2]
+% x_max = [0.2, 0.13]
+x_max = [0.2, 0.2]
+% x_min = [-0.2, -0.08]
+x_min = [-0.2, -0.2]
 
 u_min = [0-ue];
 u_max = [2-ue];
@@ -69,7 +69,7 @@ X = sdpvar(nx);
 e = 0.;
 % mpc stage cost
 Q = eye(nx);
-R = 1e-4;
+R = 1e-5;
 
 %% iterate over grid and add lmi constraints
 for i = 1:N_xgrid
@@ -221,8 +221,8 @@ Lu = [ zeros(4,1);
        1/u_max(1);
        1/u_min(1)];
 
-dw = [0,  0.001;
-      0, -0.001;];
+dw = [0,  0.0001;
+      0, -0.0001;];
 
 for i = 1:N_xgrid
     for j = 1:N_ugrid
