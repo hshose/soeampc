@@ -8,6 +8,7 @@ import math
 np.set_printoptions(edgeitems=3)
 np.core.arrayprint._line_width = 200
 
+import subprocess
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..','..'))
@@ -424,12 +425,13 @@ def parallel_sample_mpc(instances=16, samplesperinstance=int(1e5), prefix="Clust
         experimentname = parallel_experiments_common_name+"_"+str(i)+"_"
         command = [
             "python3",
-            "01_samplempc.py",
+            "10_samplempc.py",
+            "sample_mpc",
             "--showplot=False",
-            "--randomseed=None",
+            "--randomseed=None",        # all processes run with different random seed
             "--experimentname="+experimentname,
             "--numberofsamples="+str(samplesperinstance),
-            "--generate=False"]
+            "--generate=False"]         # don't export acados ocp json (which might cause file access issues in parallel)
 
         with open(fp.joinpath('logs',experimentname+".log"),"wb") as out:
             p = subprocess.Popen(command,
