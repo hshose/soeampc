@@ -17,16 +17,16 @@ fp = Path(os.path.dirname(__file__))
 os.chdir(fp)
 
 from soeampc.sampler import RandomSampler
-from soeampc.samplempc import sampledataset
+from soeampc.samplempc import sample_dataset_from_mpc
 from soeampc.mpcproblem import MPCQuadraticCostLxLu
-# from soeampc.utils import import_dataset
+from soeampc.datasetutils import import_dataset, merge_parallel_jobs, get_date_string, merge_single_parallel_job, print_dataset_statistics
 
 from dynamics.f import f
 from plot import *
 
 import fire
 
-def samplempc(
+def sample_mpc(
         showplot=True,
         experimentname="",
         numberofsamples=int(5000),
@@ -309,7 +309,7 @@ def samplempc(
             for i in range(N):
                 Uinit[i] = Kinit @ Xinit[i]
                 Uinit[i] = np.clip(Uinit[i], umin-Kdelta@Xinit[i], umax-Kdelta@Xinit[i])
-                Xinit[i+1] = mpc.singlestepsim(Xinit[i], Uinit[i])
+                Xinit[i+1] = mpc.forward_simulate_single_step(Xinit[i], Uinit[i])
 
             if verbose:
                 print("\nx0 =\n",x0)
@@ -389,7 +389,7 @@ def samplempc(
     # print(run([0, 0, -1, 0,0,0, 0,0,0,0 ]))
     # print(run([1, 1, 0, 0,0,0, 0,0,0,0 ]))
     # print(run([1, 1, 0, 0,0,0, 0,0,0,0 ]))
-    _,_,_,_, outfile = sampledataset(mpc, run, sampler, experimentname, runtobreak=True, verbose=verbose)
+    _,_,_,_, outfile = sample_dataset_from_mpc(mpc, run, sampler, experimentname, verbose=verbose)
     print("Outfile", outfile)
 
     if showplot:
@@ -406,5 +406,45 @@ def samplempc(
     return outfile
 
 
+def parallel_sample_mpc(instances=16, samplesperinstance=int(1e5), prefix="Cluster"):
+    now = get_date_string()
+
+    fp = Path(os.path.abspath(os.path.dirname(__file__)))
+    print("\n\n===============================================")
+    print("Running", instances, "as process to produce", samplesperinstance,"datapoints each")
+    print("===============================================\n")
+
+    os.chdir(fp)
+    datasetpath = str(fp.joinpath(os.path.abspath(fp),'datasets'))
+    print("datasetpath = ", datasetpath)
+    processes = []
+    parallel_experiments_common_name = prefix+"_"+str(now)+"_"
+    for i in range(instances):
+        # command = ["python3", "01_samplempc.py", "--showplot=False", "--randomseed=None", "--experimentname=Docker_"+str(now)+"_"+str(i)+"_", "--numberofsamples="+str(samplesperinstance)]
+        experimentname = parallel_experiments_common_name"_"+str(i)+"_"
+        command = [
+            "python3",
+            "01_samplempc.py",
+            "--showplot=False",
+            "--randomseed=None",
+            "--experimentname="+experimentname,
+            "--numberofsamples="+str(samplesperinstance),
+            "--generate=False"]
+
+        with open(fp.joinpath('logs',experimentname+".log"),"wb") as out:
+            p = subprocess.Popen(command,
+                stdout=out, stderr=out)
+            processes.append(p)
+
+    for p in processes:
+        p.wait()
+
+    merge_parallel_jobs([parallel_experiments_common_name], new_dataset_name=parallel_experiments_common_name[:-1])
+
 if __name__ == "__main__":
-    fire.Fire(samplempc)
+    fire.Fire({
+        'sample_mpc': sample_mpc,
+        'parallel_sample_mpc':parallel_sample_mpc,
+        'merge_single_parallel_job':merge_single_parallel_job,
+        'print_dataset_statistics':print_dataset_statistics,
+        })
