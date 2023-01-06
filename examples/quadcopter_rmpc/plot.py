@@ -74,7 +74,7 @@ def plot_quadcopter_ol(mpc, Utraj, Xtraj, labels, plt_show=True, limits={}):
         for i in range(Ntrajs):
             V = Utraj[i]
             X = Xtraj[i]
-            U = np.array([mpc.stabilizingfeedbackcontroller(X[j], V[j]) for j in range(V.shape[0])])
+            U = np.array([mpc.stabilizing_feedback_controller(X[j], V[j]) for j in range(V.shape[0])])
             for j in batch:
                 line, = plt.step(t, np.append([U[0,j]], U[:,j]), label=labels[i]+" "+ulabels[j], color=colors[j], linestyle=linestyles[i])
         plt.grid()

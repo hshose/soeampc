@@ -40,11 +40,11 @@ def plotampc(dataset='latest', model='latest'):
         print("U_MPC =\n",  U_MPC,  "\n")
         print("U_NN =\n",   U_NN,   "\n")
 
-        X_MPC = mpc.forwardsim(x0, U_MPC)
-        X_NN = mpc.forwardsim(x0, U_NN)
+        X_MPC = mpc.forward_simulate_trajectory(x0, U_MPC)
+        X_NN = mpc.forward_simulate_trajectory(x0, U_NN)
 
-        print("forwardsimcheck MPC:",   mpc.feasible(X_MPC, U_MPC,  verbose=True))
-        print("forwardsimcheck NN:",    mpc.feasible(X_NN,  U_NN,   verbose=True))
+        print("forward_simulate_trajectorycheck MPC:",   mpc.feasible(X_MPC, U_MPC,  verbose=True))
+        print("forward_simulate_trajectorycheck NN:",    mpc.feasible(X_NN,  U_NN,   verbose=True))
 
         plot_quadcopter_ol(mpc,[U_NN,U_MPC], [X_NN, X_MPC], labels=['NN','MPC'])
 
@@ -95,13 +95,13 @@ def plotmpc(dataset='latest'):
     for i in idxs:
         x0 = X[i]
         U_MPC = U[i]
-        X_MPC = mpc.forwardsim(x0, U_MPC)
+        X_MPC = mpc.forward_simulate_trajectory(x0, U_MPC)
 
         print("x0 =\n",     x0,     "\n")
-        print("U_MPC =\n",  np.array([mpc.stabilizingfeedbackcontroller(X_MPC[j], U_MPC[j]) for j in range(U_MPC.shape[0])]),  "\n")
+        print("U_MPC =\n",  np.array([mpc.stabilizing_feedback_controller(X_MPC[j], U_MPC[j]) for j in range(U_MPC.shape[0])]),  "\n")
 
 
-        print("forwardsimcheck MPC:",   mpc.feasible(X_MPC, U_MPC,  verbose=True))
+        print("forward_simulate_trajectorycheck MPC:",   mpc.feasible(X_MPC, U_MPC,  verbose=True))
 
         plot_quadcopter_ol(mpc,[U_MPC], [X_MPC], labels=['MPC'], limits=limits)
 
