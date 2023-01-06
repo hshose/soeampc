@@ -122,3 +122,18 @@ def merge_parallel_jobs(merge_list, new_dataset_name=""):
 
 def merge_single_parallel_job(dataset_name):
     return merge_parallel_jobs([dataset_name], new_dataset_name=dataset_name)
+
+def print_compute_time_statistics(compute_times):
+    print(f"Compute time mean ={ np.mean(compute_times) :.5f} [s]")
+    print(f"Compute time max = { np.max(compute_times)  :.5f} [s]")
+    print(f"Compute time sum = { np.sum(compute_times)/60/60  :.5f} [core-h]")
+
+def mpc_dataset_import(dataset_name, mpc_type=MPCQuadraticCostLxLu):
+    mpc = import_mpc(dataset_name, mpc_type)
+    X0, V, X, compute_times = import_dataset(mpc, dataset_name)
+    return mpc, X0, V, X, compute_times
+
+def print_dataset_statistics(dataset_name):
+    mpc = import_mpc(dataset_name, MPCQuadraticCostLxLu)
+    x0dataset, Udataset, Xdataset, compute_times = import_dataset(mpc, dataset_name)
+    print_compute_time_statistics(compute_times)
