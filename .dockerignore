@@ -9,3 +9,6 @@
 
 
 **/log.txt
+
+**/*.tar.gz
+**/*.tar

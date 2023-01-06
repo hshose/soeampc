@@ -167,5 +167,7 @@ experiments/
 models/
 
 *.npy
+*.tar.gz
+*.tar
 
 log.txt
