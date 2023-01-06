@@ -5,7 +5,11 @@ clc;
 addpath('/home/hose/software/casadi')
 import casadi.*
 
-writeout = true
+if getenv("WRITEOUT") == ""
+    writeout = false
+else
+     writeout = true
+end
 
 %% grid over statespace
 nx=10;
@@ -153,7 +157,7 @@ rhs = zeros(Nz,1);
 for k=1:Nz
     C(k) = norm(inv(sqrtm(P))*[eye(nx), K']*L(k,:)');
     C_lqr(k) = norm(inv(sqrtm(P_lqr))*[eye(nx), -K_lqr']*L(k,:)');
-    rhs(k) = l(k)-L(k,:)*r;
+    rhs(k) = (l(k)-L(k,:)*r);
 end
 
 res = rhs./C;
