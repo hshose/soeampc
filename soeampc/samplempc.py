@@ -1,7 +1,7 @@
 import numpy as np
 from tqdm import tqdm
 
-from .datasetutils import export_dataset, compute_time_statistics
+from .datasetutils import export_dataset, print_compute_time_statistics
 
 
 def sample_dataset_from_mpc(mpc, run, sampler, outfile, verbose=False):
@@ -68,7 +68,7 @@ def sample_dataset_from_mpc(mpc, run, sampler, outfile, verbose=False):
 
     print("Got",Nvalid,"feasible solutions for MPC")
     print("MPC compute time statistics:")
-    compute_time_statistics(computetimes[:Nvalid])
+    print_compute_time_statistics(computetimes[:Nvalid])
 
     datasetname = export_dataset(
         mpc,
