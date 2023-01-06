@@ -421,7 +421,7 @@ def parallel_sample_mpc(instances=16, samplesperinstance=int(1e5), prefix="Clust
     parallel_experiments_common_name = prefix+"_"+str(now)+"_"
     for i in range(instances):
         # command = ["python3", "01_samplempc.py", "--showplot=False", "--randomseed=None", "--experimentname=Docker_"+str(now)+"_"+str(i)+"_", "--numberofsamples="+str(samplesperinstance)]
-        experimentname = parallel_experiments_common_name"_"+str(i)+"_"
+        experimentname = parallel_experiments_common_name+"_"+str(i)+"_"
         command = [
             "python3",
             "01_samplempc.py",
