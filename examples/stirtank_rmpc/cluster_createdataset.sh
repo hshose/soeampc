@@ -4,7 +4,7 @@
 #SBATCH --job-name=soeampc_samplempc
 #SBATCH --account=rwth1288
 
-#SBATCH --array=1-80%80
+#SBATCH --array=1-20%20
 
 ### Time your job needs to execute, e. g. 15 min 30 sec
 #SBATCH --time=00:20:00
