@@ -125,7 +125,7 @@ def merge_single_parallel_job(dataset_name):
 
 def print_compute_time_statistics(compute_times):
     print(f"Compute time mean ={ np.mean(compute_times) :.5f} [s]")
-    print(f"Compute time max = { np.max(compute_times)  :.5f} [s]")
+    print(f"Compute time max 3 = { np.sort(compute_times[np.argpartition(compute_times, -3)[-3:]]) :.5f} [s]")
     print(f"Compute time sum = { np.sum(compute_times)/60/60  :.5f} [core-h]")
 
 def mpc_dataset_import(dataset_name, mpc_type=MPCQuadraticCostLxLu):

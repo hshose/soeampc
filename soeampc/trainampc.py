@@ -381,4 +381,5 @@ def test_ampc(dataset="latest", model_name="latest", p=int(1e4)):
     
     # X_test, X_train, Y_test, Y_train = train_test_split(X, U, test_size=0.1, random_state=42)
     model = import_model(modelname=model_name)
+    model.summary()
     statistical_test(mpc, model, X, Y, p=p)
