@@ -11,7 +11,11 @@ from sklearn.model_selection import train_test_split
 
 from tqdm import tqdm
 
+import time
+
 import math
+
+from .datasetutils import print_compute_time_statistics, mpc_dataset_import
 
 from pathlib import Path
 from datetime import datetime
@@ -41,28 +45,28 @@ def export_model(model, modelname):
         else:
             raise e
 
-def clipped_mae(y_true, y_pred):
-    """clipped mae loss, WARNING: HARDCODED LIMITS!!!! DO NOT USE
-    """
-    #   Args:
-    #   y_true: Ground truth values. shape = `[batch_size, d0, .. dN]`.
-    #   y_pred: The predicted values. shape = `[batch_size, d0, .. dN]`.
-    #   Returns:
-    #   Mean absolute error values. shape = `[batch_size, d0, .. dN-1]`.
-    ue   = 0.7853
-    eps = 1e-6
-    umin = -ue+eps
-    umax = 2-ue-eps
-    y_true = tf.cast(y_true, y_pred.dtype)
-    y_pred = tf.convert_to_tensor(y_pred)
-    mask = backend.equal(backend.less(y_true,umax), backend.greater(y_true, umin))
-    mask_ytrue_umax = backend.greater_equal(y_true, umax)
-    mask_ytrue_umin = backend.less_equal(y_true, umin)
-    mask_ypred_umax = backend.greater_equal(y_pred,umax)
-    mask_ypred_umin = backend.less_equal(y_pred,umin)
-    mask=tf.math.logical_or(tf.math.logical_and(mask_ytrue_umin,mask_ypred_umin),tf.math.logical_and(mask_ytrue_umax,mask_ypred_umax))
-    # print(tf.abs(y_pred - y_true)[tf.math.logical_not(mask)])
-    return backend.mean((tf.abs(y_pred - y_true)[tf.math.logical_not(mask)]), axis=-1)
+# def clipped_mae(y_true, y_pred):
+#     """clipped mae loss, WARNING: HARDCODED LIMITS!!!! DO NOT USE
+#     """
+#     #   Args:
+#     #   y_true: Ground truth values. shape = `[batch_size, d0, .. dN]`.
+#     #   y_pred: The predicted values. shape = `[batch_size, d0, .. dN]`.
+#     #   Returns:
+#     #   Mean absolute error values. shape = `[batch_size, d0, .. dN-1]`.
+#     ue   = 0.7853
+#     eps = 1e-6
+#     umin = -ue+eps
+#     umax = 2-ue-eps
+#     y_true = tf.cast(y_true, y_pred.dtype)
+#     y_pred = tf.convert_to_tensor(y_pred)
+#     mask = backend.equal(backend.less(y_true,umax), backend.greater(y_true, umin))
+#     mask_ytrue_umax = backend.greater_equal(y_true, umax)
+#     mask_ytrue_umin = backend.less_equal(y_true, umin)
+#     mask_ypred_umax = backend.greater_equal(y_pred,umax)
+#     mask_ypred_umin = backend.less_equal(y_pred,umin)
+#     mask=tf.math.logical_or(tf.math.logical_and(mask_ytrue_umin,mask_ypred_umin),tf.math.logical_and(mask_ytrue_umax,mask_ypred_umax))
+#     # print(tf.abs(y_pred - y_true)[tf.math.logical_not(mask)])
+#     return backend.mean((tf.abs(y_pred - y_true)[tf.math.logical_not(mask)]), axis=-1)
 
 # def mpc_cost_mae_with_slack(y_true, y_pred):
 #     Jtrue = 0
@@ -189,18 +193,13 @@ def train_model(model, X_train, Y_train, batch_size=int(1e4), max_epochs=int(1e3
     
     return model
 
-def retrain_model(mpc, model, X, Y, architecture_string, batch_size=int(1e4), max_epochs=int(1e3), patience=int(1e3), learning_rate=1e-3):
+def retrain_model(dataset="latest", model_name="latest", batch_size=int(1e4), max_epochs=int(1e3), patience=int(1e3), learning_rate=1e-3):
     """retrains a given model on X, Y dataset
     
     Args:
-        mpc:
-            mpc class object
         model:
             tensorflow keras class object
-        X:
-            initial conditions x0
-        Y:
-            input sequences corresponding to initial conditions x0
+
         architecture_string:
             string used for model saving
         batch_size:
@@ -214,6 +213,9 @@ def retrain_model(mpc, model, X, Y, architecture_string, batch_size=int(1e4), ma
     Returns:
         tensorflow keras model
     """
+    mpc, X, Y, _, mpc_compute_times = mpc_dataset_import(dataset)
+    model = import_model(modelname=model_name)
+    architecture_string=model_name.split('_',1)[0]
     X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.1, random_state=42)
     print("X[42]", X_train[42])
     model = train_model(model=model, X_train=X_train, Y_train=Y_train, batch_size=batch_size, max_epochs=max_epochs, patience=patience, learning_rate=learning_rate)
@@ -222,6 +224,7 @@ def retrain_model(mpc, model, X, Y, architecture_string, batch_size=int(1e4), ma
     modelname = architecture_string + '_mu=' + ('%.2f' % mu) + '_' + date
     export_model(model, modelname)
     return model
+
 
 def architecture_search(mpc, X, Y, architectures, hyperparameters, mu_crit=0.6, p_testpoints=int(10e3)):
     """Crude search for "good enough" approximator for predicting Y from X
@@ -315,18 +318,23 @@ def statistical_test(mpc, model, testpoints_X, testpoints_V, p=int(10e3), delta_
     I = np.zeros(p)
     dist = np.zeros((p,mpc.nu))
     
+    inference_times=np.zeros(p)
+    forward_sim_times=np.zeros(p)
+    
     for j in tqdm(range(p)):
         
         x0 = testpoints_X[j, :]
         Vtrue = testpoints_V[j]
-
+        tic = time.time()
         V = model(x0).numpy()
+        inference_times[j] = time.time()-tic
         V = np.reshape(V, (mpc.N, mpc.nu))
         
         # for k in range(mpc.nu):
         #     U[k,:] = np.clip(U[k,:], mpc.umin[k], mpc.umax[k])
-        
+        tic = time.time()
         X = mpc.forward_simulate_trajectory_clipped_inputs(x0,V)
+        forward_sim_times[j] = time.time() - tic
         I[j] = mpc.feasible(X,V, only_states=True)
         
         dist[j] = np.linalg.norm(V-Vtrue, np.inf, 0)
@@ -343,14 +351,34 @@ def statistical_test(mpc, model, testpoints_X, testpoints_V, p=int(10e3), delta_
     print("\t worst case passing dist (I==1): V-Vtrue =", worst_case_passing_dist)
     print("\t best case not passing dist (I==0): V-Vtrue =", best_case_not_passing_dist)
 
+    print("\ninference time statistics:")
+    print_compute_time_statistics(inference_times)
+    print("\nforward simulation time statistics:")
+    print_compute_time_statistics(forward_sim_times)
+
     if mu_crit <= mu - epsilon:
         print("test passed\n")
         return True, mu
     print("test failed for mu_crit <= mu - epsilon with", mu_crit, "!<=", mu-epsilon,"\n")
     return False, mu
 
-def teststatistical_test(X,Y):
-    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
-    model = keras.models.load_model('models/latest')
-    if statistical_test(model, X_test):
-        return model
+def test_ampc(dataset="latest", model_name="latest", p=int(1e4)):
+    """Manually performs statistical test on ampc with given dataset
+    
+    Args:
+        dataset:
+            name the dataset to be used
+        model_name:
+            name of the model to be used
+        p:
+            number of samples to be evaluated in statistical test
+
+    """
+    mpc, X, Y, _, mpc_compute_times = mpc_dataset_import(dataset)
+
+    print("\nmpc compute time statistics:")
+    print_compute_time_statistics(mpc_compute_times)
+    
+    # X_test, X_train, Y_test, Y_train = train_test_split(X, U, test_size=0.1, random_state=42)
+    model = import_model(modelname=model_name)
+    statistical_test(mpc, model, X, Y, p=p)
