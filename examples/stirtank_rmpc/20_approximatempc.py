@@ -16,7 +16,7 @@ import fire
 
 from soeampc.trainampc import architecture_search, retrain_model, import_model, test_ampc
 from soeampc.mpcproblem import *
-from soeampc.datasetutils import import_dataset
+from soeampc.datasetutils import import_dataset, print_dataset_statistics
 
 def find_approximate_mpc(dataset="latest"):
     # import latest dataset :-D
@@ -53,4 +53,5 @@ if __name__=="__main__":
         "find_approximate_mpc": find_approximate_mpc,
         "retrain_model": retrain_model,
         "test_ampc": test_ampc,
+        'print_dataset_statistics':print_dataset_statistics,
     })
