@@ -14,7 +14,7 @@
 #SBATCH --cpus-per-task=24
 
 ### File for the output
-#SBATCH --output=/home/hh753317/projects/dsme/soeampc/examples/quadcopter/logs/Cluster.%J.log
+#SBATCH --output=/home/hh753317/projects/dsme/soeampc/examples/quadcopter_rmpc/logs/Cluster.%J.log
 
 ### The last part consists of regular shell commands:
 source /home/hh753317/.bashrc
