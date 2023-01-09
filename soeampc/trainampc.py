@@ -45,6 +45,17 @@ def export_model(model, modelname):
         else:
             raise e
 
+def export_model_mpc(mpc, model, modelname):
+    export_model(model, modelname)
+    mpc.savetxt(Path("models").joinpath(modelname, "mpc_parameters"))
+
+def import_model_mpc(modelname, mpcclass=MPCQuadraticCostLxLu):
+    p = Path("models").joinpath(modelname, "mpc_parameters")
+    mpc = mpcclass.genfromtxt(p)
+    model = import_model(modelname)
+    return mpc, model
+
+
 # def clipped_mae(y_true, y_pred):
 #     """clipped mae loss, WARNING: HARDCODED LIMITS!!!! DO NOT USE
 #     """
