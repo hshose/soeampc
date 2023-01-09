@@ -263,7 +263,7 @@ def architecture_search(mpc, X, Y, architectures, hyperparameters, mu_crit=0.6, 
         print("===============================================\n")
         model = generate_model(X_train, a, output_shape)
         model.summary()
-
+        tic = time.time()
         for hp in hyperparameters:
             print("training with hyperparameters:",hp)
             model = train_model(
@@ -277,8 +277,11 @@ def architecture_search(mpc, X, Y, architectures, hyperparameters, mu_crit=0.6, 
             date = datetime.now().strftime("%Y%m%d-%H%M%S")
             modelname = '-'.join([str(d) for d in a]) + '_mu=' + ('%.2f' % mu) + '_' + date
             export_model(model, modelname)
-        if testresult:
-            return model
+
+            if testresult:
+                print(f"Training time was {time.time()-tic} [s]")
+                return model
+        print(f"Training time was {time.time()-tic} [s]")
     return None
 
 
