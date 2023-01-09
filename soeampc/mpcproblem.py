@@ -348,7 +348,7 @@ class MPCQuadraticCostLxLu(MPC):
                 u = np.clip(self.stabilizing_feedback_controller(x, v), self.__umin, self.__umax)
             else:
                 u = self.stabilizing_feedback_controller(x, V[idx,:])    
-            cost = cost + x@self.__Q@x.T + u*self.__R*u.T
+            cost = cost + x@self.__Q@x.T + u@self.__R@u.T
         
         cost = cost+X[self.N]@self.__P@X[self.N].T
         return cost
