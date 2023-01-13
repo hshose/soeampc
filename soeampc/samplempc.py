@@ -80,26 +80,48 @@ def sample_dataset_from_mpc(mpc, run, sampler, outfile, verbose=False):
     return X0dataset[:Nvalid,:], Udataset[:Nvalid,:,:], Xdataset[:Nvalid,:,:], computetimes[:Nvalid], datasetname
 
     
-def inspectdataset(mpc, file):
+# def inspectdataset(mpc, file):
 
-    plot_feas(X0dataset[:Nvalid,:],np.array([xmin_init[0], xmax_init[0]]), np.array([xmin_init[1], xmax_init[1]]))
-    if args.write:
-        plt.savefig("figures/"+ps+"_feasible_set.pgf")
-    if args.plots:
-        plt.show()
-    plt.clf()
-    plot_ctdistro(computetimes[:Nvalid])
-    if args.write:
-        plt.savefig("figures/"+ps+"_compute_time_distro.pgf")
-    if args.plots:
-        plt.show()
+#     plot_feas(X0dataset[:Nvalid,:],np.array([xmin_init[0], xmax_init[0]]), np.array([xmin_init[1], xmax_init[1]]))
+#     if args.write:
+#         plt.savefig("figures/"+ps+"_feasible_set.pgf")
+#     if args.plots:
+#         plt.show()
+#     plt.clf()
+#     plot_ctdistro(computetimes[:Nvalid])
+#     if args.write:
+#         plt.savefig("figures/"+ps+"_compute_time_distro.pgf")
+#     if args.plots:
+#         plt.show()
 
-    Ngood = 0
-    print("Performing forward sim check on all samples")
-    for i in tqdm(range(Nvalid)):
-        x0 = X0dataset[i,:]
-        U = Udataset[i,:]
-        allgood = forward_simulate_trajectorycheck(x0, U, c.Tf, c.N)
-        Ngood += allgood
+#     Ngood = 0
+#     print("Performing forward sim check on all samples")
+#     for i in tqdm(range(Nvalid)):
+#         x0 = X0dataset[i,:]
+#         U = Udataset[i,:]
+#         allgood = forward_simulate_trajectorycheck(x0, U, c.Tf, c.N)
+#         Ngood += allgood
 
-    print("Forward sim checks passed:", Ngood/Nvalid*100,"[%]")
+#     print("Forward sim checks passed:", Ngood/Nvalid*100,"[%]")
+
+
+def computetime_test_fwd_sim(run, dataset="latest", N_samples = int(10e3)):
+    mpc, X, V, _, _ = mpc_dataset_import(dataset)
+    if N_samples >= X.shape[0]:
+        N_samples = X.shape[0]
+        print("WARNING: N_samples exceeds size of dataset, will use N_samples =", N_samples,"instead")
+    # X_test, X_train, Y_test, Y_train = train_test_split(X, U, test_size=0.1, random_state=42)
+    tic = time.time()
+    for i in range(N_samples):
+        run(X[i])
+    duration = time.time() - tic
+    print(f"mean duration was {duration/N_samples*1000} [ms]")
+
+
+    duration = 0
+    for i in range(N_samples):
+        tic = time.time()
+        run(X[i])
+        duration = max(duration, time.time() - tic)
+    
+    print(f"max duration was {duration*1000} [ms]")

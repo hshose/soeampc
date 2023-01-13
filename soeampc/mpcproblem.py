@@ -301,6 +301,7 @@ class MPCQuadraticCostLxLu(MPC):
             # print(X,U)
             print("\t LxLu constraints violated:   ", np.where(constrineq == False))
             print("constr ineq = ", constrineq)
+            print(f"vals  = {(X[:-1])[np.logical_not(np.all(constrineq, axis=0))]}")
         return np.all( constrineq )
 
     def in_terminal_constraints(self, x, verbose = False, eps = 1e-4, robust=True):
@@ -314,10 +315,10 @@ class MPCQuadraticCostLxLu(MPC):
             print("\t Terminal constraint x.T P x = ", r, " <= ", alpha**2, "is violated")
         return constrineq
 
-    def feasible(self,X,U, verbose=False, only_states=True, robust=False):
+    def feasible(self,X,U, verbose=False, only_states=True, robust=False, eps=0.0001):
         res = True
-        res = res and self.in_state_and_input_constraints(X,U, robust=robust, only_states=only_states)
-        res = res and self.in_terminal_constraints(X[-1,:],    robust=robust)
+        res = res and self.in_state_and_input_constraints(X,U, robust=robust, only_states=only_states, eps=eps)
+        res = res and self.in_terminal_constraints(X[-1,:],    robust=robust, eps=eps)
         if verbose and not res:
             print("Infeasible Trajectory")
             print("\tin state constraint:   ", self.in_state_and_input_constraints(X, U, verbose=True, robust=robust, only_states=only_states))
@@ -338,6 +339,27 @@ class MPCQuadraticCostLxLu(MPC):
             return X
         else:
             raise Exception('DT not implemented yet')
+
+    def forward_simulate_single_step_clipped_inputs(self,x,v):
+        Ts = self.Tf/self.N
+        t = np.linspace(0,Ts,2)
+        if self.f_type == 'CT':
+            def f_pwconst_input(y,t):
+                    x = y
+                    ustable = np.clip(self.stabilizing_feedback_controller(x, v), self.__umin, self.__umax)
+                    return tuple(self.f(x, ustable))
+
+            X = odeint(f_pwconst_input, x, t)
+            return X[-1]
+        else:
+            raise Exception('DT not implemented yet')
+
+
+    def stabilizing_feedback_controller_clipped_inputs(self, x, v):
+        u = np.clip(self.stabilizing_feedback_controller(x,v), self.__umin, self.__umax)
+        if any(u > self.__umax) or any(u < self.__umin):
+            print(u)
+        return u
 
     def cost(self, X, U, clipped_inputs=True):
         cost = 0

@@ -20,7 +20,7 @@ os.chdir(fp)
 from soeampc.sampler import RandomSampler
 from soeampc.samplempc import sample_dataset_from_mpc
 from soeampc.mpcproblem import MPCQuadraticCostLxLu
-from soeampc.datasetutils import import_dataset, merge_parallel_jobs, get_date_string, merge_single_parallel_job, print_dataset_statistics
+from soeampc.datasetutils import import_dataset, merge_parallel_jobs, get_date_string, merge_single_parallel_job, print_dataset_statistics, computetime_test_fwd_sim
 
 from dynamics.f import f
 from plot import *
@@ -443,10 +443,24 @@ def parallel_sample_mpc(instances=16, samplesperinstance=int(1e5), prefix="Clust
 
     merge_parallel_jobs([parallel_experiments_common_name], new_dataset_name=parallel_experiments_common_name[:-1])
 
+def computetime_test_fwd_sim_quadcopter(dataset="latest"):
+    name = 'stirtank'
+    ocp = quadcopter_rmpc_ocp()
+    acados_integrator = AcadosSimSolver(ocp, 'acados_ocp_' + name + '.json', build = False, generate=False)
+    def run(x0, V):
+        X = np.zeros(x0.shape[0], V.shape(0)+1)
+        X[0] = np.copy(x0)
+        for i in range(len(V)):
+            X[i+1] = acados_integrator.simulate(x=np.append(x0,0), u=V[i])
+
+        return X
+    computetime_test_fwd_sim(run, dataset)
+
 if __name__ == "__main__":
     fire.Fire({
         'sample_mpc': sample_mpc,
         'parallel_sample_mpc':parallel_sample_mpc,
         'merge_single_parallel_job':merge_single_parallel_job,
         'print_dataset_statistics':print_dataset_statistics,
+        'computetime_test_fwd_sim_quadcopter': computetime_test_fwd_sim_quadcopter,
         })

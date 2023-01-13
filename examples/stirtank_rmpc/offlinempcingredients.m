@@ -1,10 +1,9 @@
-
 %continous-time formulation
-
-tbxmanager restorepath
 
 clear all;
 clc;
+
+tbxmanager restorepath
 
 addpath('/home/hose/software/casadi')
 import casadi.*

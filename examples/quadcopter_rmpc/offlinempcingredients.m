@@ -2,13 +2,16 @@
 clear all;
 clc;
 
+tbxmanager restorepath
+
 addpath('/home/hose/software/casadi')
 import casadi.*
 
-if getenv("WRITEOUT") == ""
-    writeout = false
-else
-     writeout = true
+writeout = ~( getenv("WRITEOUT") == "");
+if ~writeout
+    disp("")
+    disp("WARN: mpc parameters will NOT be written to file")
+    disp("if you want to export, set environemt variable WRITEOUT")
 end
 
 %% grid over statespace

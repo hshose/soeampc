@@ -14,7 +14,7 @@ os.chdir(fp)
 
 import fire
 
-from soeampc.trainampc import architecture_search, retrain_model, import_model, test_ampc
+from soeampc.trainampc import architecture_search, retrain_model, import_model, test_ampc, computetime_test_model
 from soeampc.mpcproblem import *
 from soeampc.datasetutils import import_dataset, print_dataset_statistics
 
@@ -35,11 +35,11 @@ def find_approximate_mpc(dataset="latest"):
         # [mpc.nx, 40, 80, 160, mpc.nu*mpc.N]
         ])
 
-    hyperparameters = [ {"learning_rate":0.01,  "patience": 1000, "max_epochs": 1000, "batch_size": 10000},
-                        {"learning_rate":0.01, "patience": 1000, "max_epochs": 100000, "batch_size": 10000},
-                        {"learning_rate":0.005, "patience": 1000, "max_epochs": 100000, "batch_size": 10000},
-                        {"learning_rate":0.002, "patience": 1000, "max_epochs": 100000, "batch_size": 10000},
-                        {"learning_rate":0.001, "patience": 1000, "max_epochs": 100000, "batch_size": 10000},
+    hyperparameters = [ {"learning_rate":0.01,   "patience": 1000, "max_epochs": 1000,   "batch_size": 10000},
+                        {"learning_rate":0.01,   "patience": 1000, "max_epochs": 100000, "batch_size": 10000},
+                        {"learning_rate":0.005,  "patience": 1000, "max_epochs": 100000, "batch_size": 10000},
+                        {"learning_rate":0.002,  "patience": 1000, "max_epochs": 100000, "batch_size": 10000},
+                        {"learning_rate":0.001,  "patience": 1000, "max_epochs": 100000, "batch_size": 10000},
                         {"learning_rate":0.0005, "patience": 1000, "max_epochs": 100000, "batch_size": 10000},
                         {"learning_rate":0.0002, "patience": 1000, "max_epochs": 100000, "batch_size": 10000},
                         {"learning_rate":0.0001, "patience": 1000, "max_epochs": 100000, "batch_size": 10000},]
@@ -50,8 +50,9 @@ def find_approximate_mpc(dataset="latest"):
 
 if __name__=="__main__":
     fire.Fire({
-        "find_approximate_mpc": find_approximate_mpc,
-        "retrain_model": retrain_model,
-        "test_ampc": test_ampc,
-        'print_dataset_statistics':print_dataset_statistics,
+        "find_approximate_mpc":     find_approximate_mpc,
+        "retrain_model":            retrain_model,
+        "test_ampc":                test_ampc,
+        "print_dataset_statistics": print_dataset_statistics,
+        "computetime_test_model":   computetime_test_model,
     })

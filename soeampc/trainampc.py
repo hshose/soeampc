@@ -16,6 +16,7 @@ import time
 import math
 
 from .datasetutils import print_compute_time_statistics, mpc_dataset_import
+from .mpcproblem import MPCQuadraticCostLxLu
 
 from pathlib import Path
 from datetime import datetime
@@ -397,3 +398,17 @@ def test_ampc(dataset="latest", model_name="latest", p=int(1e4)):
     model = import_model(modelname=model_name)
     model.summary()
     statistical_test(mpc, model, X, Y, p=p)
+
+
+def computetime_test_model(dataset="latest", model_name="latest", N_samples = int(10e3)):
+    mpc, X, V, _, _ = mpc_dataset_import(dataset)
+    if N_samples >= X.shape[0]:
+        N_samples = X.shape[0]
+        print("WARNING: N_samples exceeds size of dataset, will use N_samples =", N_samples,"instead")
+    # X_test, X_train, Y_test, Y_train = train_test_split(X, U, test_size=0.1, random_state=42)
+    model = import_model(modelname=model_name)
+
+    tic = time.time()
+    model.predict(X[:N_samples])
+    duration = time.time() - tic
+    print(f"mean duration was {duration/N_samples*1000} [ms]")

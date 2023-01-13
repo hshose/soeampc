@@ -14,7 +14,7 @@ import fire
 fp = Path(os.path.dirname(__file__))
 os.chdir(fp)
 
-from soeampc.trainampc import architecture_search, retrain_model, test_ampc
+from soeampc.trainampc import architecture_search, retrain_model, test_ampc, computetime_test_model
 from soeampc.mpcproblem import *
 from soeampc.datasetutils import import_dataset, print_dataset_statistics
 
@@ -50,4 +50,5 @@ if __name__=="__main__":
         "retrain_model": retrain_model,
         "test_ampc": test_ampc,
         "print_dataset_statistics": print_dataset_statistics,
+        "computetime_test_model":   computetime_test_model,
     })

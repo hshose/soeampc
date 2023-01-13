@@ -3,14 +3,14 @@ from tqdm import tqdm
 
 from .mpcproblem import MPCQuadraticCostLxLu, MPC
 from .datasetutils import mpc_dataset_import
-from .trainampc import import_model
+from .trainampc import import_model, import_model_mpc
 import copy 
 
 class AMPC():
     def __init__(self, mpc, model):
         self.__mpc = mpc
         self.__model = model
-        self.__feasible = True
+        self.__feasible = False
 
     @property
     def mpc(self):
@@ -37,7 +37,7 @@ class AMPC():
         V = self.V(x0)
         X = self.mpc.forward_simulate_trajectory_clipped_inputs(x0,V)
         self.__feasible = self.mpc.feasible(X, V)
-        return V[0]
+        return V[0], X[1]
 
 class SafeOnlineEvaluationAMPC(AMPC):
 
@@ -47,12 +47,12 @@ class SafeOnlineEvaluationAMPC(AMPC):
         # super(SafeOnlineEvaluationAMPC,SafeOnlineEvaluationAMPC).model.__set__(self,model)
         self.__V_candidate = None
         self.__X_candidate = None
-        self.__feasible = True
 
-    def initialize_candidate(self, x0, V_initialize):
+    def initialize_candidate(self, x0, V_initialize, verbose=False):
         self.__V_candidate = V_initialize
         self.__X_candidate = self.mpc.forward_simulate_trajectory_clipped_inputs(x0,V_initialize)
-        if not self.mpc.in_state_and_input_constraints(self.__X_candidate, self.__V_candidate, robust=False):
+        self.__feasible = self.mpc.feasible(self.__X_candidate, self.__V_candidate, robust=False)
+        if not self.mpc.in_state_and_input_constraints(self.__X_candidate, self.__V_candidate, robust=False) and verbose:
             print("WARNING: Initialization infeasible!")
 
     def initialize(self,x0,V):
@@ -86,7 +86,11 @@ class SafeOnlineEvaluationAMPC(AMPC):
         if enforce_cost_decrease:
             cd = ( self.mpc.cost(X, V) <= self.mpc.cost(self.__X_candidate, self.__V_candidate ) )
 
-        if self.mpc.feasible(X,V) and cd: # only check for cost decrease if we want to enforce it
+        cf = self.mpc.feasible(self.__X_candidate, self.__V_candidate)
+        # if not cf:
+            # print(f"THIS SHOULD NEVER HAPPEN {self.i}")
+
+        if (self.mpc.feasible(X,V) and cd) or (not cf): # only check for cost decrease if we want to enforce it, if candidate is infeasible, always take NN, we have no guarantees anyways
             self.__V_candidate = copy.deepcopy(V)
             self.__X_candidate = copy.deepcopy(X)
             self.__feasible = True
@@ -96,14 +100,23 @@ class SafeOnlineEvaluationAMPC(AMPC):
             self.__feasible = False
 
         v = np.copy(self.__V_candidate[0])
-
+        x = np.copy(self.__X_candidate[1])
         # print("this candidate is feasible", self.mpc.in_state_and_input_constraints(self.__X_candidate, self.__V_candidate, verbose=True))
 
+        # if not self.mpc.feasible(self.__X_candidate, self.__V_candidate, verbose=True):
+        #     print(f"SECOND THIS SHOULD NEVER HAPPEN {self.i}")
+        # v_old_candidate = np.copy(self.__V_candidate)
+        # x_old_candidate = np.copy(self.__X_candidate)
+
         self.__X_candidate, self.__V_candidate = self.shift_append_terminal(self.__X_candidate, self.__V_candidate)
-        # print("X_cand", self.__X_candidate)
-        # print("V_cand", self.__V_candidate)
-        # print("next candidate is feasible", self.mpc.in_state_and_input_constraints(self.__X_candidate, self.__V_candidate, verbose=True))
-        return v
+        
+        # if not self.mpc.feasible(self.__X_candidate, self.__V_candidate, verbose=True):
+        #     print(f"THIRD THIS SHOULD ALSO NEVER HAPPEN {self.i}")
+        #     print(f"{self.__V_candidate[:-1]-v_old_candidate[1:]}")
+        #     print(f"{self.__X_candidate[:-1]-x_old_candidate[1:]}")
+
+        # self.i +=1
+        return v,x
 
     def __call__(self,x0):
         V = self.V(x0)
@@ -114,6 +127,7 @@ class SafeOnlineEvaluationAMPCGroundTruethInit(SafeOnlineEvaluationAMPC):
         super().__init__(mpc, model)
 
     def initialize(self, x0, V):
+        self.i = 0
         return self.initialize_candidate(x0, V)
 
 
@@ -131,7 +145,6 @@ def closed_loop_experiment(x0, controller, Nsim=1000):
             maximum closed loop simulation steps for timeout, defaults to 1000
 
     Returns:
-        tuple (status, X_cl, U_cl, V_cl, feasible_ampc) with status string, X, U and V closed loop results of shape (N_controllers, mpc.N, nx/nu) and feasible_ampc is array of bools indicating if the the ampc solution was taken or a backup solution was invoked.
         
     """
     nx = controller.mpc.nx
@@ -148,9 +161,9 @@ def closed_loop_experiment(x0, controller, Nsim=1000):
     for k in range(Nsim-1):
         # print("\nTIMESTEP ",k, "CONTROLLER", i)
         x0_ol = X_cl[k,:]
-        v = controller(x0_ol)
-        x1_ol = controller.mpc.forward_simulate_single_step(x0_ol, v)
-        u = controller.mpc.stabilizing_feedback_controller(x0_ol, v)
+        v, x1_ol = controller(x0_ol)
+        # x1_ol = controller.mpc.forward_simulate_single_step(x0_ol, v)
+        u = controller.mpc.stabilizing_feedback_controller_clipped_inputs(x0_ol, v)
         
         V_cl[k,:]         = np.copy(v)
         U_cl[k,:]         = np.copy(u)
@@ -161,10 +174,10 @@ def closed_loop_experiment(x0, controller, Nsim=1000):
         feasible_cl = np.copy(controller.mpc.in_state_and_input_constraints(X_cl[:k+2,:], V_cl[:k+1,:], robust=False, verbose=False))
         if not feasible_cl:
             status = 'infeasible_cl'
-            print("SOMETHING IS NOT FEASIBLE")
-            controller.mpc.in_state_and_input_constraints(X_cl[:k+2,:], V_cl[:k+1,:], robust=False, verbose=True)
-            print(feasible_ampc[:k])
-            print(U_cl[:k,:])
+            # print("SOMETHING IS NOT FEASIBLE")
+            # controller.mpc.in_state_and_input_constraints(X_cl[:k+2,:], V_cl[:k+1,:], robust=False, verbose=True)
+            # print(feasible_ampc[:k+1])
+            # print(U_cl[:k,:])
         
         terminalset_reached = controller.mpc.in_terminal_constraints(x1_ol, robust=False )
         if terminalset_reached:
@@ -180,22 +193,22 @@ def iterate_controllers(x0, V_init, controllers, Nsim=1000):
     results = []
     for controller in controllers:
         controller.initialize(x0, V_init)
+        feasible_init = controller.feasible
         status, X, U, V, feasible = closed_loop_experiment(x0, controller, Nsim=Nsim)
-        results.append({"status":status, "X":X, "U":U, "V":V, "feasible": feasible, })
+        results.append({"status":status, "X":X, "U":U, "V":V, "feasible": feasible, "feasible_init": feasible_init})
     return results
 
 def closed_loop_test_on_dataset(dataset, model_name, N_samples=int(1e3)):
     """performs closed loop simulation on dataset of initial conditions
     
     Args:
-        X_test:
-            dataset of initial conditions
-        Y_test:
-            corresponding open-loop trajectories used for initialization (should be feasible solution to mpc problem at corresponding x0)
-        controllers:
-            array of controllers to be tested (see closed_loop_experiment)
+        dataset:
+            dataset name to be imported
+        model_name:
+            name model to be imported
+        N_samples:
+            number of samples to be evaluated from dataset
     Returns:
-        array of dicts, containing initial states and closed loop trajectories for all controllers at which at least one controller was infeasible
     """
     mpc, X, V, _, _ = mpc_dataset_import(dataset)
     if N_samples >= X.shape[0]:
@@ -223,22 +236,68 @@ def closed_loop_test_on_dataset(dataset, model_name, N_samples=int(1e3)):
 
     for j in range(len(controllers)):
         mu_cl_feasible = np.mean(np.array([results[i][j]["status"]!="infeasible_cl" for i in range(N_samples)]))
-        status_initially_feasible = [ results[i][j]["status"] for i in range(N_samples) if results[i][j]["feasible"][0] ]
+        status_initially_feasible = [ results[i][j]["status"] for i in range(N_samples) if results[i][j]["feasible"][0] or results[i][j]["feasible_init"] ]
         mu_cl_feasible_of_initially_feasible = np.mean(status_initially_feasible!="infeasible_cl")
         print(f"Results for controller: {controller_names[j]}:\n\t {mu_cl_feasible=} \n\t{mu_cl_feasible_of_initially_feasible=}")
 
+    idx_naive_infeas_safe_feas = [i for i in range(N_samples) if (results[i][0]["status"] == "infeasible_cl" ) and ( results[i][1]["status"] != "infeasible_cl")]
+    print(f"{idx_naive_infeas_safe_feas=}")
 
-        # if status == 'infeasible':
-        #     # print(U_cl)
-        #     print(status,"\n\n")
-        #     results = np.append(results, {"x0":x0, "X_cl": X_cl, "U_cl": U_cl, "V_cl": V_cl, "feasible_ampc": feasible_ampc})
-        # if status == 'timeout':
-        #     # print(U_cl)
-        #     print(status,"\n\n")
-        #     # results = np.append(results, {"x0":x0, "X_cl": X_cl, "U_cl": U_cl, "V_cl": V_cl, "feasible_ampc": feasible_ampc})
+    return [results[idx] for idx in idx_naive_infeas_safe_feas], controller_names, mpc
 
+def closed_loop_test_wtf(dataset, model_name, N_samples=int(1e3)):
+    mpc, X, V, _, _ = mpc_dataset_import(dataset)
+    if N_samples >= X.shape[0]:
+        N_samples = X.shape[0]
+        print("WARNING: N_samples exceeds size of dataset, will use N_samples =", N_samples,"instead")
+    # X_test, X_train, Y_test, Y_train = train_test_split(X, U, test_size=0.1, random_state=42)
+    model = import_model(modelname=model_name)
+
+    controller = SafeOnlineEvaluationAMPCGroundTruethInit(mpc, model)
+
+    X_test = X[:N_samples]
+    V_test = V[:N_samples]
+    results = []
+    print("\ntesting controllers on", len(X_test), "initial conditions in closed loop\n")
+    for i in tqdm(range(N_samples)):
+        x0              = X_test[i]
+        V_initialize    = V_test[i]
+        controller.initialize(x0, V_initialize)
+        status, X, U, V, feasible = closed_loop_experiment(x0, controller, Nsim=N_samples)
+        if ( status == "infeasible_cl" ) and feasible[0]:
+            print(f"{X=},{U=},{V=}")
+
+def closed_loop_test_on_sampler(model_name, sampler, N_samples=int(1e3)):
+    """performs closed loop simulation on sampled initial conditions
     
-            
-            
-def closed_loop_test_on_sampler():
-    pass
+    Args:
+        model_name:
+            name of the model to be tested
+        sampler:
+            instance of class sampler
+        N_samples:
+            number of samples to be evaluated
+    Returns:
+        array of dicts, containing initial states and closed loop trajectories for all controllers at which at least one controller was infeasible
+    """
+    mpc, model = import_model_mpc(modelname=model_name)
+
+    naive_controller = AMPC(mpc, model)
+    safe_controller = SafeOnlineEvaluationAMPC(mpc, model)
+
+    controllers = [ naive_controller, safe_controller ]
+    controller_names = [ "naive", "safe" ]
+    
+    results = []
+
+    print(f"\ntesting controllers on {N_samples} initial conditions in closed loop\n")
+    for i in tqdm(range(N_samples)):
+        x0 = sampler.sample()
+        simulation_results = iterate_controllers(x0, None, controllers)
+        results.append(simulation_results)
+
+    for j in range(len(controllers)):
+        mu_cl_feasible = np.mean(np.array([results[i][j]["status"]!="infeasible_cl" for i in range(N_samples)]))
+        status_initially_feasible = np.array([ results[i][j]["status"]!="infeasible_cl" for i in range(N_samples) if results[i][j]["feasible_init"] or results[i][j]["feasible"][0]])
+        mu_cl_feasible_of_initially_feasible = np.mean(status_initially_feasible)
+        print(f"Results for controller: {controller_names[j]}:\n\t {mu_cl_feasible=} \n\t{mu_cl_feasible_of_initially_feasible=}")
