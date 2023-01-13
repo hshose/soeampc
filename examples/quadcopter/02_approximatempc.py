@@ -31,7 +31,7 @@ def approximatempc(dataset="latest", maxepochs=int(1e6), batchsize=int(1e4)):
 
     # traverse list until architecture is found
     # datasetname = "latest"
-    model = hyperparametertuning(mpc, X, U, dataset, architectures, batchsize=batchsize, maxepochs=maxepochs)
+    model = architecture_search(mpc, X, U, dataset, architectures, batchsize=batchsize, maxepochs=maxepochs)
 
 
 def retrainampc(datasetname="latest", modelname="latest", maxepochs = 5000, learningrate=1e-3):

@@ -16,7 +16,7 @@ from pathlib import Path
 fp = Path(os.path.dirname(__file__))
 os.chdir(fp)
 
-from soeampc import RandomSampler, sampledataset, MPCQuadraticCostBoxConstr, import_dataset
+from soeampc import RandomSampler, sample_dataset_from_mpc, MPCQuadraticCostBoxConstr, import_dataset
 from dynamics.f import f
 
 from plot import *
@@ -248,7 +248,7 @@ def samplempc(showplot=True, experimentname="", numberofsamples=int(1e5), random
     # print(run([1, 1, 0, 0,0,0, 0,0,0,0 ]))
     # print(run([1, 1, 0, 0,0,0, 0,0,0,0 ]))
 
-    _,_,_,_, outfile = sampledataset(mpc, run, sampler, experimentname, runtobreak=True, verbose=verbose)
+    _,_,_,_, outfile = sample_dataset_from_mpc(mpc, run, sampler, experimentname, runtobreak=True, verbose=verbose)
     print("Outfile", outfile)
 
     if showplot:

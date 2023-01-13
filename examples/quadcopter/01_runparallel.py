@@ -6,7 +6,7 @@ from pathlib import Path
 
 import fire
 
-def runparallel(instances=16, samplesperinstance=int(1e5), prefix="Cluster"):
+def run_parallel(instances=16, samplesperinstance=int(1e5), prefix="Cluster"):
     now = datetime.now().strftime("%Y%m%d-%H%M%S")
     containertag = "soeampc:"+str(now)
 
@@ -40,4 +40,4 @@ def runparallel(instances=16, samplesperinstance=int(1e5), prefix="Cluster"):
         p.wait()
 
 if __name__=="__main__":
-    fire.Fire(runparallel)
+    fire.Fire(run_parallel)

@@ -20,5 +20,5 @@ source /home/hh753317/.bashrc
 
 cd /home/hh753317/projects/dsme/soeampc/examples/quadcopter
 
-python3 01_runparallel.py \
+python3 01_run_parallel.py \
     --instances=24 --samplesperinstance=5000 --prefix=Cluster_$(date +"%Y_%m_%d_%I_%M_%p")_${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}

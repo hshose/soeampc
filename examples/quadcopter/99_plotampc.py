@@ -40,11 +40,11 @@ def plotampc(dataset='latest', model='latest'):
         print("U_MPC =\n",  U_MPC,  "\n")
         print("U_NN =\n",   U_NN,   "\n")
 
-        X_MPC = mpc.forwardsim(x0, U_MPC)
-        X_NN = mpc.forwardsim(x0, U_NN)
+        X_MPC = mpc.forward_simulate_trajectory(x0, U_MPC)
+        X_NN = mpc.forward_simulate_trajectory(x0, U_NN)
 
-        print("forwardsimcheck MPC:",   mpc.feasible(X_MPC, U_MPC,  verbose=True))
-        print("forwardsimcheck NN:",    mpc.feasible(X_NN,  U_NN,   verbose=True))
+        print("forward_simulate_trajectorycheck MPC:",   mpc.feasible(X_MPC, U_MPC,  verbose=True))
+        print("forward_simulate_trajectorycheck NN:",    mpc.feasible(X_NN,  U_NN,   verbose=True))
 
         plot_quadcopter_ol(mpc,[U_NN,U_MPC], [X_NN, X_MPC], labels=['NN','MPC'])
 

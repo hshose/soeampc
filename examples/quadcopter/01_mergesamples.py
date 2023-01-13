@@ -41,7 +41,7 @@ def mergeclusterjobs(arrayjobids):
 
     foldernames = [name for name in os.listdir(p) if any(str(ajobid) in name for ajobid in arrayjobids) ] 
     
-    return mergesamples(foldernames, removeaftermerge=True)
+    return mergesamples(foldernames, remove_after_merge=True)
 
 def mergesingleclusterjob(id):
     return mergeclusterjobs([id])
@@ -58,7 +58,7 @@ def mergedocker(now, Nsamples):
     appendfolders = [name for name in os.listdir(p) if "Docker_"+str(now) in name and not "Docker_"+str(now)+"_0_" in name]
 
     foldernames = copyfolder+appendfolders
-    return mergesamples(foldernames, now, removeaftermerge=True)
+    return mergesamples(foldernames, now, remove_after_merge=True)
 
 def mergelist():
     filenames = [   
@@ -84,7 +84,7 @@ def mergelist():
                 ]
     return mergesamples(filenames)
 
-def mergesamples(foldernames, now=getdatestring(), removeaftermerge=False):
+def mergesamples(foldernames, now=get_date_string(), remove_after_merge=False):
     p=Path("datasets")
     mpc = import_mpc(foldernames[0])
     print("file:", foldernames[0])
@@ -103,7 +103,7 @@ def mergesamples(foldernames, now=getdatestring(), removeaftermerge=False):
     print("\nExported merged dataset to:\n")
     print("\t", exportfilename,"\n")
 
-    if removeaftermerge:
+    if remove_after_merge:
         print("\n\nRemoving Folders:\n")
         print("\t", foldernames)
         for f in foldernames:
