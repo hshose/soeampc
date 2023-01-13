@@ -165,6 +165,8 @@ acados_ocp*.json
 datasets/
 experiments/
 models/
+examples/*/figures
+
 
 *.npy
 *.tar.gz
