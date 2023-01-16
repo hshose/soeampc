@@ -52,7 +52,7 @@ for n_mass = 3:6
     con=[];
     % rho_c=0.192;
     % rho_c=0.0802;
-    rho_c=0.192;
+    rho_c=0.192*10;
     Y = sdpvar(nu,nx);
     X = sdpvar(nx);
     % mpc stage cost
@@ -166,7 +166,7 @@ for n_mass = 3:6
     for k=1:Nz
         C(k) = norm(inv(sqrtm(P))*[eye(nx), K']*L(k,:)');
         C_lqr(k) = norm(inv(sqrtm(P_lqr))*[eye(nx), -K_lqr']*L(k,:)');
-        rhs(k) = (l(k)-L(k,:)*r)^2;
+        rhs(k) = (l(k)-L(k,:)*r);
     end
 
     res = rhs./C;
@@ -194,4 +194,87 @@ for n_mass = 3:6
     writematrix(reshape(round(R,6),1,[]),   'mpc_parameters/R_'+string(n_mass)+'.txt');
     writematrix(alpha,                      'mpc_parameters/alpha_'+string(n_mass)+'.txt');
     writematrix(reshape(round(xref,6),1,[]), 'mpc_parameters/xref_'+string(n_mass)+'.txt');
+
+
+    % Constraint Tighetning
+    con=[];
+    % c_u=1;
+    % rho_c=0.0802;
+    wbar=1;
+    Y = sdpvar(nu,nx);
+    X = sdpvar(nx);
+
+    uw = 5e-3*[  1,  1,  1;
+                1,  1, -1;
+                1, -1,  1;
+                1, -1, -1;
+                -1,  1,  1;
+                -1,  1, -1;
+                -1, -1,  1;
+                -1, -1, -1];
+    dw = (B*uw')';
+    xmin(1:nxpos) = -0.5;
+    xmax(1:nxpos) =  0.5;
+    for i = 1:Nsamples
+        px = xmin + rand(nx,1).*(xmax-xmin);
+        pu = umin + rand(nu,1).*(umax-umin);
+        A = full(Afunc(px, pu));
+        B = full(Bfunc(px, pu));
+        ineq=[(A*X+B*Y)+(A*X+B*Y)'+2*rho_c*X];
+        con=[con;ineq<=0];
+    end
+    con=[con; X>=0];
+
+    for j=1:size(Lx,1)
+        ineq=[1,Lx(j,:)*X+Lu(j,:)*Y;...
+            (Lx(j,:)*X+Lu(j,:)*Y)',X];
+        con=[con;ineq>=0];
+    end
+
+    for j=1:size(dw,1)
+        ineq=[X, dw(j,:)';
+            dw(j,:), wbar^2];
+        con=[con;ineq>=0];
+    end
+
+    disp('Starting optimization');
+    optimize(con,-log(det(X)))
+    % 
+    Y=value(Y);
+    X=value(X);
+    Pdelta=X^-1
+    Kdelta=Y*X^-1
+
+    dmax = sqrt(wbar/Pdelta(2,2))
+    wbarmin = dw(1,:)*Pdelta*dw(1,:)'
+
+    cj = [];
+    for i = 1:size(L,1)
+        % norm(inv(sqrtm(P))*[eye(nx), K']*L(k,:)')^2;
+        cj = [cj; norm(inv(sqrtm(Pdelta))*[eye(nx), Kdelta']*L(i,:)')];
+    end
+
+    c_max = max(cj);
+
+    alpha_s = norm(sqrtm(P)*inv(sqrtm(Pdelta)));
+    Tf = 8
+    alpha_terminal = alpha - alpha_s*(1-exp(-rho_c*Tf))/rho_c*wbarmin;
+
+    disp('alpha_terminal')
+    disp(alpha_terminal)
+
+    if alpha_terminal < 0
+        disp('ERROR: alpha_terminal is negative, MPC problem will always be infeasible')
+        return
+    end
+
+    writematrix(round(wbarmin, 6),             'mpc_parameters/wbar_'+string(n_mass)+'.txt');
+    writematrix(round(rho_c, 6),               'mpc_parameters/rho_c_'+string(n_mass)+'.txt');
+    writematrix(reshape(round(Pdelta,6),1,[]), 'mpc_parameters/Pdelta_'+string(n_mass)+'.txt');
+    writematrix(reshape(round(Kdelta,6),1,[]), 'mpc_parameters/Kdelta_'+string(n_mass)+'.txt');
+    writematrix(reshape(round(cj,6),1,[]),     'mpc_parameters/Ls_'+string(n_mass)+'.txt');
+    writematrix(reshape(round(Lx,6),1,[]),     'mpc_parameters/Lx_'+string(n_mass)+'.txt');
+    writematrix(reshape(round(Lu,6),1,[]),     'mpc_parameters/Lu_'+string(n_mass)+'.txt');
+    writematrix(Tf,                            'mpc_parameters/Tf_'+string(n_mass)+'.txt');
+    writematrix(alpha_s,                       'mpc_parameters/alpha_s_'+string(n_mass)+'.txt');
 end
