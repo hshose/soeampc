@@ -1,4 +1,4 @@
-from acados_template import AcadosOcp, AcadosOcpSolver, AcadosSimSolver, AcadosModel
+from acados_template import AcadosOcp, AcadosOcpSolver, AcadosSimSolver, AcadosModel, AcadosSim
 from casadi import SX, vertcat, sin, cos, tan, Function, sign, tanh, norm_2, sqrt
 import numpy as np
 import scipy.linalg
@@ -18,14 +18,53 @@ fp = Path(os.path.dirname(__file__))
 os.chdir(fp)
 
 from soeampc.sampler import RandomSampler
-from soeampc.samplempc import sample_dataset_from_mpc
+from soeampc.samplempc import sample_dataset_from_mpc, computetime_test_fwd_sim
 from soeampc.mpcproblem import MPCQuadraticCostLxLu
-from soeampc.datasetutils import import_dataset, merge_parallel_jobs, get_date_string, merge_single_parallel_job, print_dataset_statistics, computetime_test_fwd_sim
+from soeampc.datasetutils import import_dataset, merge_parallel_jobs, get_date_string, merge_single_parallel_job, print_dataset_statistics
 
 from dynamics.f import f
 from plot import *
 
 import fire
+
+def export_quadcopter_ode_model():
+    rho       = float(np.genfromtxt(fp.joinpath('mpc_parameters','rho_c.txt'), delimiter=',')) # 10
+    w_bar     = float(np.genfromtxt(fp.joinpath('mpc_parameters','wbar.txt'), delimiter=',')) # 4.6e-1
+
+    nx = 10
+    nu = 3
+    Kdelta = np.reshape(np.genfromtxt(fp.joinpath('mpc_parameters','Kdelta.txt'), delimiter=','), (nx,nu)).T
+
+    model_name = 'quadcopter'
+
+    # set up states & controls
+    x = SX.sym('x', nx, 1)
+    u = SX.sym('u', nu, 1)       
+    xdot = SX.sym('xdot', nx, 1)
+    s     =  SX.sym('s')
+    sdot     =  SX.sym('sdot')
+
+    # print(x.shape)
+    v = SX.sym('u', nu, 1)
+    u = Kdelta @ x + v
+
+    # xdot
+    fx = f(x,u)
+    f_impl = vertcat(vertcat(*fx)-xdot, -rho*s+w_bar-sdot)
+
+    model = AcadosModel()
+
+    model.f_impl_expr = f_impl
+    # model.f_expl_expr = f_expl
+    model.x = vertcat(x, s)
+    model.xdot = vertcat(xdot, sdot)
+    model.u = v
+
+    # model.z = z
+    model.p = []
+    model.name = model_name
+
+    return model
 
 def sample_mpc(
         showplot=True,
@@ -33,7 +72,6 @@ def sample_mpc(
         numberofsamples=int(5000),
         randomseed=42,
         verbose=False,
-        withstabilizingfeedback=True,
         generate=True,
         nlpiter=400
         ):
@@ -47,46 +85,10 @@ def sample_mpc(
 
     nx = 10
     nu = 3
-    Kdelta = None
-    if withstabilizingfeedback:
-        Kdelta = np.reshape(np.genfromtxt(fp.joinpath('mpc_parameters','Kdelta.txt'), delimiter=','), (nx,nu)).T
-        print("Kdelta=\n",Kdelta,"\n")
+    Kdelta = np.reshape(np.genfromtxt(fp.joinpath('mpc_parameters','Kdelta.txt'), delimiter=','), (nx,nu)).T
+    print("Kdelta=\n",Kdelta,"\n")
     
-    def export_quadcopter_ode_model():
 
-        model_name = 'quadcopter'
-
-        # set up states & controls
-        x = SX.sym('x', nx, 1)
-        u = SX.sym('u', nu, 1)       
-        xdot = SX.sym('xdot', nx, 1)
-        s     =  SX.sym('s')
-        sdot     =  SX.sym('sdot')
-
-        # print(x.shape)
-        if withstabilizingfeedback:
-            v = SX.sym('u', nu, 1)
-            u = Kdelta @ x + v
-
-        # xdot
-        fx = f(x,u)
-        f_impl = vertcat(vertcat(*fx)-xdot, -rho*s+w_bar-sdot)
-
-        model = AcadosModel()
-
-        model.f_impl_expr = f_impl
-        # model.f_expl_expr = f_expl
-        model.x = vertcat(x, s)
-        model.xdot = vertcat(xdot, sdot)
-        if withstabilizingfeedback:
-            model.u = v
-        else:
-            model.u = u
-        # model.z = z
-        model.p = []
-        model.name = model_name
-
-        return model
 
     # create ocp object to formulate the OCP
     ocp = AcadosOcp()
@@ -163,9 +165,8 @@ def sample_mpc(
     # therefore, the stabilizing feedback term is
     #            Lu @ Kdelta @ x + Lu @ v <= 1
     #           |---- Lx ----|
-    if withstabilizingfeedback:
-        Lx[nxconstr:nxconstr+nu, :]      = Lu[nxconstr:nxconstr+nu]@Kdelta
-        Lx[nxconstr+nu:nxconstr+2*nu, :] = Lu[nxconstr+nu:nxconstr+2*nu]@Kdelta
+    Lx[nxconstr:nxconstr+nu, :]      = Lu[nxconstr:nxconstr+nu]@Kdelta
+    Lx[nxconstr+nu:nxconstr+2*nu, :] = Lu[nxconstr+nu:nxconstr+2*nu]@Kdelta
 
     print("Lx = \n", Lx,"\n")
     print("Lu = \n", Lu,"\n")
@@ -444,15 +445,26 @@ def parallel_sample_mpc(instances=16, samplesperinstance=int(1e5), prefix="Clust
     merge_parallel_jobs([parallel_experiments_common_name], new_dataset_name=parallel_experiments_common_name[:-1])
 
 def computetime_test_fwd_sim_quadcopter(dataset="latest"):
-    name = 'stirtank'
-    ocp = quadcopter_rmpc_ocp()
-    acados_integrator = AcadosSimSolver(ocp, 'acados_ocp_' + name + '.json', build = False, generate=False)
-    def run(x0, V):
-        X = np.zeros(x0.shape[0], V.shape(0)+1)
-        X[0] = np.copy(x0)
-        for i in range(len(V)):
-            X[i+1] = acados_integrator.simulate(x=np.append(x0,0), u=V[i])
+    name = 'quadcopter'
+    model = export_quadcopter_ode_model()
+    Tf = float(np.genfromtxt(fp.joinpath('mpc_parameters','Tf.txt'), delimiter=','))
+    N = 10
+    sim = AcadosSim()
+    sim.model = model
 
+    sim.solver_options.T = Tf/N
+    sim.solver_options.integrator_type = 'IRK'
+    sim.solver_options.num_stages  = 4                     # number of stages in the integrator
+    sim.solver_options.num_steps   = 1                     # number of steps in the integrator
+    sim.solver_options.newton_iter = 3                     # number of Newton iterations in simulation method
+
+    acados_integrator = AcadosSimSolver(sim, 'acados_ocp_' + name + '_sim.json')
+
+    def run(x0, V):
+        X = np.zeros((V.shape[0]+1,x0.shape[0]+1 ))
+        X[0] = np.copy(np.append(x0,0))
+        for i in range(len(V)):
+            X[i+1] = acados_integrator.simulate(x=X[i], u=V[i])
         return X
     computetime_test_fwd_sim(run, dataset)
 

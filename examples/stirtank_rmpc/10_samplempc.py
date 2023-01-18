@@ -1,4 +1,4 @@
-from acados_template import AcadosOcp, AcadosOcpSolver, AcadosSimSolver, AcadosModel
+from acados_template import AcadosOcp, AcadosOcpSolver, AcadosSimSolver, AcadosModel, AcadosSim
 from casadi import SX, vertcat, sin, cos, Function, sign, tanh
 import numpy as np
 import scipy.linalg
@@ -37,31 +37,14 @@ Typical usage example:
     python3 10_samplempc.py parallel_sample_mpc
 """
 
-def sample_mpc(
-        showplot=True,
-        experimentname="",
-        numberofsamples=int(5000),
-        randomseed=42,
-        verbose=False,
-        withstabilizingfeedback=True,
-        generate=True,
-        nlpiter=1000
-        ):
+def export_stirtank_ode_model():
 
-    print("\n\n===============================================")
-    print("Setting up ACADOS OCP problem")
-    print("===============================================\n")
+        rho       = float(np.genfromtxt(fp.joinpath('mpc_parameters','rho_c.txt'), delimiter=',')) # 10
+        w_bar     = float(np.genfromtxt(fp.joinpath('mpc_parameters','wbar.txt'), delimiter=',')) # 4.6e-1
+        nx = 2
+        nu = 1
 
-    rho       = float(np.genfromtxt(fp.joinpath('mpc_parameters','rho_c.txt'), delimiter=',')) # 10
-    w_bar     = float(np.genfromtxt(fp.joinpath('mpc_parameters','wbar.txt'), delimiter=',')) # 4.6e-1
-    nx = 2
-    nu = 1
-    Kdelta = None
-    if withstabilizingfeedback:
         Kdelta = np.reshape(np.genfromtxt(fp.joinpath('mpc_parameters','Kdelta.txt'), delimiter=','), (nx,nu)).T
-        print("Kdelta=\n",Kdelta,"\n")
-
-    def export_stirtank_ode_model():
 
         model_name = 'stirtank'
 
@@ -72,9 +55,8 @@ def sample_mpc(
         s     =  SX.sym('s')
         sdot     =  SX.sym('sdot')
 
-        if withstabilizingfeedback:
-            v = SX.sym('u', nu, 1)
-            u = Kdelta @ x + v
+        v = SX.sym('u', nu, 1)
+        u = Kdelta @ x + v
 
         fx = f(x,u)
         # rho       = 10
@@ -88,14 +70,33 @@ def sample_mpc(
         model.x = x
         model.x = vertcat(x, s)
         model.xdot = vertcat(xdot, sdot)
-        if withstabilizingfeedback:
-            model.u = v
-        else:
-            model.u = u
+        model.u = v
         model.p = []
         model.name = model_name
 
         return model
+
+def sample_mpc(
+        showplot=True,
+        experimentname="",
+        numberofsamples=int(5000),
+        randomseed=42,
+        verbose=False,
+        generate=True,
+        nlpiter=1000
+        ):
+
+    print("\n\n===============================================")
+    print("Setting up ACADOS OCP problem")
+    print("===============================================\n")
+
+    rho       = float(np.genfromtxt(fp.joinpath('mpc_parameters','rho_c.txt'), delimiter=',')) # 10
+    w_bar     = float(np.genfromtxt(fp.joinpath('mpc_parameters','wbar.txt'), delimiter=',')) # 4.6e-1
+    nx = 2
+    nu = 1
+
+    Kdelta = np.reshape(np.genfromtxt(fp.joinpath('mpc_parameters','Kdelta.txt'), delimiter=','), (nx,nu)).T
+    print("Kdelta=\n",Kdelta,"\n")
 
     # create ocp object to formulate the OCP
     ocp = AcadosOcp()
@@ -175,9 +176,8 @@ def sample_mpc(
     # therefore, the stabilizing feedback term is
     #            Lu @ Kdelta @ x + Lu @ v <= 1
     #           |---- Lx ----|
-    if withstabilizingfeedback:
-        Lx[nxconstr:nxconstr+nu, :]      = Lu[nxconstr:nxconstr+nu]@Kdelta
-        Lx[nxconstr+nu:nxconstr+2*nu, :] = Lu[nxconstr+nu:nxconstr+2*nu]@Kdelta
+    Lx[nxconstr:nxconstr+nu, :]      = Lu[nxconstr:nxconstr+nu]@Kdelta
+    Lx[nxconstr+nu:nxconstr+2*nu, :] = Lu[nxconstr+nu:nxconstr+2*nu]@Kdelta
 
     print("Lx = \n", Lx,"\n")
     print("Lu = \n", Lu,"\n")
@@ -399,13 +399,25 @@ def parallel_sample_mpc(instances=16, samplesperinstance=int(1e5), prefix="Clust
 
 def computetime_test_fwd_sim_stirtank(dataset="latest"):
     name = 'stirtank'
-    acados_integrator = AcadosSimSolver(ocp, 'acados_ocp_' + name + '.json', build = False, generate=False)
-    def run(x0, V):
-        X = np.zeros(x0.shape[0], V.shape(0)+1)
-        X[0] = np.copy(x0)
-        for i in range(len(V)):
-            X[i+1] = acados_integrator.simulate(x=np.append(x0,0), u=V[i])
+    model = export_stirtank_ode_model()
+    Tf = float(np.genfromtxt(fp.joinpath('mpc_parameters','Tf.txt'), delimiter=','))
+    N = 10
+    sim = AcadosSim()
+    sim.model = model
 
+    sim.solver_options.T = Tf/N
+    sim.solver_options.integrator_type = 'IRK'
+    sim.solver_options.num_stages  = 6                     # number of stages in the integrator
+    sim.solver_options.num_steps   = 1                     # number of steps in the integrator
+    sim.solver_options.newton_iter = 3                     # number of Newton iterations in simulation method
+
+    acados_integrator = AcadosSimSolver(sim, 'acados_ocp_' + name + '_sim.json')
+
+    def run(x0, V):
+        X = np.zeros((V.shape[0]+1,x0.shape[0]+1 ))
+        X[0] = np.copy(np.append(x0,0))
+        for i in range(len(V)):
+            X[i+1] = acados_integrator.simulate(x=X[i], u=V[i])
         return X
     computetime_test_fwd_sim(run, dataset)
 
