@@ -411,4 +411,23 @@ def computetime_test_model(dataset="latest", model_name="latest", N_samples = in
     tic = time.time()
     model.predict(X[:N_samples])
     duration = time.time() - tic
-    print(f"mean duration was {duration/N_samples*1000} [ms]")
+    print(f"mean duration .predict() was {duration/N_samples*1000} [ms]")
+    
+    tic = time.time()
+    model.predict(X[:N_samples], batch_size=1, max_queue_size=1)
+    duration = time.time() - tic
+    print(f"mean duration .predict(batch_size=1) was {duration/N_samples*1000} [ms]")
+    
+    
+    # tic = time.time()
+    # for i in range(N_samples):
+    #     model.predict(X[i], verbose=0)
+    # duration = time.time() - tic
+    # print(f"mean duration on .predict() called on single point was {duration/N_samples*1000} [ms]")
+
+    # tic = time.time()
+    # for i in range(N_samples):
+    #     model(X[i])
+    # duration = time.time() - tic
+    # print(f"mean duration of __call__() on single point was {duration/N_samples*1000} [ms]")
+    

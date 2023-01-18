@@ -1,7 +1,8 @@
 import numpy as np
 from tqdm import tqdm
+import time
 
-from .datasetutils import export_dataset, print_compute_time_statistics
+from .datasetutils import export_dataset, print_compute_time_statistics, mpc_dataset_import
 
 
 def sample_dataset_from_mpc(mpc, run, sampler, outfile, verbose=False):
@@ -113,15 +114,16 @@ def computetime_test_fwd_sim(run, dataset="latest", N_samples = int(10e3)):
     # X_test, X_train, Y_test, Y_train = train_test_split(X, U, test_size=0.1, random_state=42)
     tic = time.time()
     for i in range(N_samples):
-        run(X[i])
+        run(X[i], V[i])
     duration = time.time() - tic
     print(f"mean duration was {duration/N_samples*1000} [ms]")
 
 
-    duration = 0
+    compute_times = np.zeros(N_samples)
     for i in range(N_samples):
         tic = time.time()
-        run(X[i])
-        duration = max(duration, time.time() - tic)
+        run(X[i], V[i])
+        compute_times[i] = time.time() - tic
     
-    print(f"max duration was {duration*1000} [ms]")
+    print_compute_time_statistics(compute_times)
+    # print(f"max duration was {duration*1000} [ms]")
