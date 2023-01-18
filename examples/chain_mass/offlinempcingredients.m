@@ -2,14 +2,17 @@
 clear all;
 clc;
 
+tbxmanager restorepath;
 addpath('/home/hose/software/casadi')
 import casadi.*
 addpath('./dynamics/');
 
-rng('default');
-rng(42);
-
-for n_mass = 3:6
+for n_mass = 4:4
+    %continous-time formulation
+    clearvars -except n_mass;
+    rng('default');
+    rng(42);
+    
     % n_mass = 6;          % number of masses
     M = n_mass - 2;      % number of intermediate masses
     nx = (2*M + 1)*3;    % differential states
@@ -52,7 +55,8 @@ for n_mass = 3:6
     con=[];
     % rho_c=0.192;
     % rho_c=0.0802;
-    rho_c=0.192*10;
+    rho_c=0.192;
+    % rho_c=0.8;
     Y = sdpvar(nu,nx);
     X = sdpvar(nx);
     % mpc stage cost
@@ -63,13 +67,13 @@ for n_mass = 3:6
 
     q = [ones(3*M,1); 25*ones(3,1); ones(nxvel,1)];
     Q = diag(q);
-    R = 1e-2*eye(nu);
+    R = 1e0*eye(nu);
     e=0;
 
     % random samples
     Nsamples = 1e3;
-    xmin = -ones(nx,1);
-    xmax = ones(nx,1);
+    xmin = -0.1*ones(nx,1);
+    xmax = 0.1*ones(nx,1);
     nbx = M+1;
     xmin(1:nxpos) = -0.1;
     xmax(1:nxpos) =  0.1;
@@ -213,8 +217,10 @@ for n_mass = 3:6
                 -1, -1,  1;
                 -1, -1, -1];
     dw = (B*uw')';
-    xmin(1:nxpos) = -0.5;
-    xmax(1:nxpos) =  0.5;
+    xmin = -0.5*ones(nx,1);
+    xmax = 0.5*ones(nx,1);
+    xmin(1:nxpos) = -0.25;
+    xmax(1:nxpos) =  0.25;
     for i = 1:Nsamples
         px = xmin + rand(nx,1).*(xmax-xmin);
         pu = umin + rand(nu,1).*(umax-umin);
@@ -245,7 +251,7 @@ for n_mass = 3:6
     Pdelta=X^-1
     Kdelta=Y*X^-1
 
-    dmax = sqrt(wbar/Pdelta(2,2))
+    % dmax = sqrt(wbar/Pdelta(2,2))
     wbarmin = dw(1,:)*Pdelta*dw(1,:)'
 
     cj = [];
