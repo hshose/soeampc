@@ -7,7 +7,7 @@
 #SBATCH --array=1-80%80
 
 ### Time your job needs to execute, e. g. 15 min 30 sec
-#SBATCH --time=10:00:00
+#SBATCH --time=16:00:00
 
 ### CPUS
 #SBATCH --ntasks=1
