@@ -7,7 +7,7 @@ addpath('/home/hose/software/casadi')
 import casadi.*
 addpath('./dynamics/');
 
-for n_mass = 4:4
+for n_mass = 3:3
     %continous-time formulation
     clearvars -except n_mass;
     rng('default');
@@ -67,7 +67,7 @@ for n_mass = 4:4
 
     q = [ones(3*M,1); 25*ones(3,1); ones(nxvel,1)];
     Q = diag(q);
-    R = 1e0*eye(nu);
+    R = 1e-1*eye(nu);
     e=0;
 
     % random samples
@@ -263,7 +263,11 @@ for n_mass = 4:4
     c_max = max(cj);
 
     alpha_s = norm(sqrtm(P)*inv(sqrtm(Pdelta)));
-    Tf = 8
+    if n_mass == 3
+        Tf = 2
+    elseif n_mass == 4
+        Tf = 3
+    end
     alpha_terminal = alpha - alpha_s*(1-exp(-rho_c*Tf))/rho_c*wbarmin;
 
     disp('alpha_terminal')

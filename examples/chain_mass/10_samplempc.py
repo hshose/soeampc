@@ -20,7 +20,7 @@ os.chdir(fp)
 from soeampc.sampler import RandomSampler
 from soeampc.samplempc import sample_dataset_from_mpc, computetime_test_fwd_sim
 from soeampc.mpcproblem import MPCQuadraticCostLxLu
-from soeampc.datasetutils import import_dataset, merge_parallel_jobs, get_date_string, merge_single_parallel_job, print_dataset_statistics
+from soeampc.datasetutils import import_dataset, merge_parallel_jobs, get_date_string, merge_single_parallel_job, print_dataset_statistics, mpc_dataset_import
 
 import fire
 import importlib
@@ -101,8 +101,9 @@ def sample_mpc(
     model = export_chain_mass_model(n_mass)
     ocp.model = model
 
-    N = 40
     Tf = float(np.genfromtxt(fp.joinpath('mpc_parameters',f'Tf_{n_mass}.txt'), delimiter=','))
+    N = int(Tf/0.2)
+    # Tf = 3
     nx = model.x.size()[0]-1
     nx_ = model.x.size()[0]
     nu = model.u.size()[0]
@@ -165,6 +166,8 @@ def sample_mpc(
     Lx = np.reshape(np.genfromtxt(fp.joinpath('mpc_parameters',f'Lx_{n_mass}.txt'), delimiter=','), (nx,nconstr)).T
     Lu = np.reshape(np.genfromtxt(fp.joinpath('mpc_parameters',f'Lu_{n_mass}.txt'), delimiter=','), (nu,nconstr)).T
     Ls = np.reshape(np.genfromtxt(fp.joinpath('mpc_parameters',f'Ls_{n_mass}.txt'), delimiter=','), (1,nconstr)).T
+    Lx[nxconstr:nxconstr+nu, :]      = Lu[nxconstr:nxconstr+nu]@Kdelta
+    Lx[nxconstr+nu:nxconstr+2*nu, :] = Lu[nxconstr+nu:nxconstr+2*nu]@Kdelta
     print("Lx = \n", Lx,"\n")
     print("Lu = \n", Lu,"\n")
     print("Ls = \n", Ls,"\n")
@@ -235,7 +238,7 @@ def sample_mpc(
     ocp.solver_options.globalization='MERIT_BACKTRACKING'
     ocp.solver_options.globalization_use_SOC=1
 
-    ocp.solver_options.sim_method_num_stages = 2
+    ocp.solver_options.sim_method_num_stages = 4
     ocp.solver_options.sim_method_num_steps = 2
 
     nlp_tol = 1e-4
@@ -250,11 +253,17 @@ def sample_mpc(
     if generate:
         acados_ocp_solver = AcadosOcpSolver(ocp, json_file = 'acados_ocp_' + model.name + '.json')
 
+    if n_mass == 3:
+        xmin = -0.5*np.ones(nx)
+        xmax = 0.5*np.ones(nx)
+        xmin[:3*(M+1)] = -0.25*np.ones(3*(M+1))
+        xmax[:3*(M+1)] = 0.25*np.ones(3*(M+1))
+    elif n_mass == 4:
+        xmin = -0.25*np.ones(nx)
+        xmax = 0.25*np.ones(nx)
+        xmin[:3*(M+1)] = -0.1*np.ones(3*(M+1))
+        xmax[:3*(M+1)] = 0.1*np.ones(3*(M+1))
 
-    xmin = -0.5*np.ones(nx)
-    xmax = 0.5*np.ones(nx)
-    xmin[:3*(M+1)] = -0.25*np.ones(3*(M+1))
-    xmax[:3*(M+1)] = 0.25*np.ones(3*(M+1))
     for i in range(M+1):
         xmin[i*3+1] = -0.1
 
@@ -390,6 +399,27 @@ def computetime_test_fwd_sim_chainmass(n_mass, dataset="latest"):
         return X
     computetime_test_fwd_sim(run, dataset)
 
+def plot_dataset_ol(dataset="latest"):
+    mpc, X0, V, X, compute_times = mpc_dataset_import(dataset)
+    x_min = [None for i in range(mpc.nx)]
+    M = int((mpc.nx/3-1)/2)
+    for i in range(M+1):
+        x_min[3*i+1]= -0.1
+
+    x_max = [None for i in range(mpc.nx)]
+    # x_min = [None, -0.1, None, None, -0.1, None, None, None, None]
+    # x_max = [None, None, None, None, None, None, None, None, None]
+    u_min = [-1 for i in range(3)]
+    u_max = [1 for i in range(3)]
+    limits = {
+        "xmin": x_min,
+        "xmax": x_max,
+        "umin": u_min,
+        "umax": u_max
+    }
+    for i in range(len(V)):
+        plot_chain_mass_ol(mpc,[V[i]], [X[i]], labels=["gt"], limits=limits)
+
 if __name__ == "__main__":
     fire.Fire({
         'sample_mpc': sample_mpc,
@@ -397,4 +427,5 @@ if __name__ == "__main__":
         'merge_single_parallel_job':merge_single_parallel_job,
         'print_dataset_statistics':print_dataset_statistics,
         'computetime_test_fwd_sim_chainmass': computetime_test_fwd_sim_chainmass,
+        'plot_dataset_ol': plot_dataset_ol,
         })

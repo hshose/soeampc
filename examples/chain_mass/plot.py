@@ -144,7 +144,7 @@ def plot_quadcopter_ol_V(mpc, Vtraj, labels):
     plt.legend(loc=1)
     plt.show()
 
-def plot_quadcopter_ol(mpc, Utraj, Xtraj, labels, plt_show=True, limits={}):
+def plot_chain_mass_ol(mpc, Utraj, Xtraj, labels, plt_show=True, limits={}):
     # # latexify plot
     # if latexify:
     #     params = {'backend': 'ps',
@@ -169,15 +169,22 @@ def plot_quadcopter_ol(mpc, Utraj, Xtraj, labels, plt_show=True, limits={}):
     Ts = t[1] - t[0]
 
     Ntrajs = len(Utraj)
+    print(Xtraj[0].shape)
 
     linestyles = ['solid', 'dotted', 'dashed', 'dashdot']
     looselydashed = (0, (5, 10))
-    colors = ['r','g','b','c','m','y','k', 'darkred', 'navy', 'darkgreen']
+    colors = ['r','g','b','r','g','b','r','g','b','r','g','b','r','g','b','r','g','b']
 
-    xbatches = [[0,1,2], [3,4,5], [6,8], [7,9]]
-    ubatches = [[0,1],[2]]
+    nxbatches = int(nx/3)
+    xbatches = [[3*i, 3*i+1, 3*i+2] for i in range(nxbatches)]
 
-    xlabels = ["x_1", "x_2", "x_3", "v_1", "v_2", "v_3", "phi_1", "omega_1", "phi_2", "omega_2"]
+    ubatches = [[0,1,2]]
+
+    M = int((nx/3-1)/2)
+    xlabels = [f"p_{i},{c}" for i in range(M+1) for c in ["x", "y", "z"] ]
+    xlabels = xlabels + [f"v_{i},{c}" for i in range(M) for c in ["x", "y", "z"] ]
+
+    # xlabels = ["p_1,x", "p_1,y", "p_1,z", "p_2,x", "p_2,y", "p_2,z", "v_1,x", "v_1,y", "v_1,z"]
     ulabels = ["u_1", "u_2", "u_3"]
 
     batches = len(xbatches) + len(ubatches)
