@@ -7,7 +7,7 @@
 #SBATCH --array=1-80%80
 
 ### Time your job needs to execute, e. g. 15 min 30 sec
-#SBATCH --time=20:00:00
+#SBATCH --time=10:00:00
 
 ### CPUS
 #SBATCH --ntasks=1
@@ -22,4 +22,4 @@ source /home/hh753317/.bashrc
 cd /home/hh753317/projects/dsme/soeampc/examples/chain_mass
 
 python3 10_samplempc.py parallel_sample_mpc \
-    --instances=24 --samplesperinstance=3000 --prefix=Cluster_$(date +"%Y_%m_%d_%I_%M_%p")_${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}
+    --instances=24 --samplesperinstance=5000 --prefix=Cluster_$(date +"%Y_%m_%d_%I_%M_%p")_${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}
