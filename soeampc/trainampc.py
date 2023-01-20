@@ -290,10 +290,10 @@ def architecture_search(mpc, X, Y, architectures, hyperparameters, mu_crit=0.6, 
             modelname = '-'.join([str(d) for d in a]) + '_mu=' + ('%.2f' % mu) + '_' + date
             export_model(model, modelname)
 
+            print(f"Training time so far was {time.time()-tic} [s]")
             if testresult:
-                print(f"Training time was {time.time()-tic} [s]")
                 return model
-        print(f"Training time was {time.time()-tic} [s]")
+        # print(f"Training time was {time.time()-tic} [s]")
     return None
 
 
@@ -360,11 +360,17 @@ def statistical_test(mpc, model, testpoints_X, testpoints_V, p=int(10e3), delta_
     epsilon = math.sqrt(-math.log(delta_h/2)/(2*p))
     print("\t epsilon =", epsilon)
 
-    worst_case_passing_dist = np.max(dist[I==1],0)
-    best_case_not_passing_dist = np.min(dist[I==0],0)
+    if len(I[I==1])>0:
+        worst_case_passing_dist = np.max(dist[I==1],0)
+        print("\t worst case passing dist (I==1): V-Vtrue =", worst_case_passing_dist)
+    else:
+        print("\t worst case passing dist (I==1) not computed, no testpoint passed the test")
+    if len(I[I==0])>0:
+        best_case_not_passing_dist = np.min(dist[I==0],0)
+        print("\t best case not passing dist (I==0): V-Vtrue =", best_case_not_passing_dist)
+    else:
+        print("\t best case not passing dist (I==0) not omputed, all points passed the test")
 
-    print("\t worst case passing dist (I==1): V-Vtrue =", worst_case_passing_dist)
-    print("\t best case not passing dist (I==0): V-Vtrue =", best_case_not_passing_dist)
 
     print("\ninference time statistics:")
     print_compute_time_statistics(inference_times)
