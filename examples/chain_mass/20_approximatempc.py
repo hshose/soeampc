@@ -33,13 +33,13 @@ def find_approximate_mpc(dataset="latest"):
 
     # traverse list until architecture is found
     # datasetname = "latest"
-    hyperparameters = [ {"learning_rate":0.01,   "patience": 1000, "max_epochs": 10, "batch_size": 10000},
-                        {"learning_rate":0.005,  "patience": 1000, "max_epochs": 10, "batch_size": 10000},
-                        {"learning_rate":0.002,  "patience": 1000, "max_epochs": 10, "batch_size": 10000},
-                        {"learning_rate":0.001,  "patience": 1000, "max_epochs": 10, "batch_size": 10000},
-                        {"learning_rate":0.0005, "patience": 1000, "max_epochs": 10, "batch_size": 10000},
-                        {"learning_rate":0.0002, "patience": 1000, "max_epochs": 10, "batch_size": 10000},
-                        {"learning_rate":0.0001, "patience": 1000, "max_epochs": 10, "batch_size": 10000},]
+    hyperparameters = [ {"learning_rate":0.01,   "patience": 1000, "max_epochs": 10000, "batch_size": 10000},
+                        {"learning_rate":0.005,  "patience": 1000, "max_epochs": 10000, "batch_size": 10000},
+                        {"learning_rate":0.002,  "patience": 1000, "max_epochs": 10000, "batch_size": 10000},
+                        {"learning_rate":0.001,  "patience": 1000, "max_epochs": 10000, "batch_size": 10000},
+                        {"learning_rate":0.0005, "patience": 1000, "max_epochs": 10000, "batch_size": 10000},
+                        {"learning_rate":0.0002, "patience": 1000, "max_epochs": 10000, "batch_size": 10000},
+                        {"learning_rate":0.0001, "patience": 1000, "max_epochs": 10000, "batch_size": 10000},]
 
     model = architecture_search(mpc, X, U, hyperparameters=hyperparameters, architectures=architectures)
     return model
