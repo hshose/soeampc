@@ -264,10 +264,9 @@ def architecture_search(mpc, X, Y, architectures, hyperparameters, mu_crit=0.6, 
     import tensorflow as tf
     gpus = tf.config.experimental.list_physical_devices('GPU')
     if gpus:
-        try:
-            tf.config.experimental.set_virtual_device_configuration(gpus[0], [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=24576)])
-            tf.config.experimental.set_virtual_device_configuration(gpus[1], [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=24576)])
-        except RuntimeError as e:
+        tf.config.experimental.set_virtual_device_configuration(gpus[0], [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=24576)])
+        tf.config.experimental.set_virtual_device_configuration(gpus[1], [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=24576)])
+
     print(e)
     X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.1, random_state=42)
     output_shape=Y_train.shape[1:]
