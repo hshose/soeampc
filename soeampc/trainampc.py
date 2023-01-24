@@ -264,7 +264,7 @@ def architecture_search(mpc, X, Y, architectures, hyperparameters, mu_crit=0.6, 
     import tensorflow as tf
     gpus = tf.config.experimental.list_physical_devices('GPU')
     if gpus:
-        for i in range(gpus):
+        for i in range(len(gpus)):
             tf.config.experimental.set_virtual_device_configuration(gpus[i], [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=24576)])
 
     print(e)
