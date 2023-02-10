@@ -11,7 +11,7 @@ os.chdir(fp)
 
 import fire
 
-from soeampc.safeonline import closed_loop_test_on_dataset, closed_loop_test_on_sampler, closed_loop_test_wtf
+from soeampc.safeonline import closed_loop_test_on_dataset, closed_loop_test_on_sampler, closed_loop_test_wtf, closed_loop_test_reason
 from soeampc.sampler import RandomSampler
 
 from plot import plot_quadcopter_cl
@@ -64,4 +64,5 @@ if __name__=="__main__":
         "closed_loop_test_on_sampler_quadcopter_rmpc": closed_loop_test_on_sampler_quadcopter_rmpc,
         "closed_loop_test_on_dataset_plot": closed_loop_test_on_dataset_plot,
         "closed_loop_test_wtf": closed_loop_test_wtf,
+        "closed_loop_test_reason": closed_loop_test_reason,
     })

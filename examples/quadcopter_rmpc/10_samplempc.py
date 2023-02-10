@@ -277,9 +277,9 @@ def sample_mpc(
     #     print(acados_ocp_solver.get(i,'x'))
     #     print(acados_ocp_solver.get(i,'u'))
 
-    xmin = np.array([-2.5, -2.5, -3, -3, -5, -5, -math.pi/180*20, -3*math.pi, -math.pi/180*20, -3*math.pi]) 
+    xmin = np.array([-2.5,   -2.5,  -3,  -3, -3, -5, -math.pi/180*20, -3*math.pi, -math.pi/180*20, -3*math.pi]) 
     # xmin = np.array([-2, -2, -2, 0,0,0,0,0,0,0]) 
-    xmax = np.array([ 1,  2.5,  2.5,  3,  3,  5,  math.pi/180*20,  3*math.pi,  math.pi/180*20,  3*math.pi]) 
+    xmax = np.array([ 0.145,  2.5,  2.5,  3,  3,  5,  math.pi/180*20,  3*math.pi,  math.pi/180*20,  3*math.pi]) 
     # xmax = np.array([ 1,  2,  2,  0,0,0,0,0,0,0]) 
     
     umax = np.array([1/Lu[nxconstr+i, i] for i in range(nu)])

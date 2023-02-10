@@ -11,7 +11,7 @@ os.chdir(fp)
 
 import fire
 
-from soeampc.safeonline import closed_loop_test_on_dataset, closed_loop_test_on_sampler
+from soeampc.safeonline import closed_loop_test_on_dataset, closed_loop_test_on_sampler, closed_loop_test_reason
 from soeampc.sampler import RandomSampler
 
 # def evaluate_on_sampler(dataset="latest", model="latest", N_samples=int(1e3)):
@@ -36,4 +36,5 @@ if __name__=="__main__":
     fire.Fire({
         "closed_loop_test_on_dataset": closed_loop_test_on_dataset,
         "closed_loop_test_on_sampler_stirtank_rmpc": closed_loop_test_on_sampler_stirtank_rmpc,
+        "closed_loop_test_reason": closed_loop_test_reason,
     })

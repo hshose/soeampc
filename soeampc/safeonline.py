@@ -48,7 +48,7 @@ class SafeOnlineEvaluationAMPC(AMPC):
         self.__V_candidate = None
         self.__X_candidate = None
 
-    def initialize_candidate(self, x0, V_initialize, verbose=False):
+    def initialize_candidate(self, x0, V_initialize, verbose=True):
         self.__V_candidate = V_initialize
         self.__X_candidate = self.mpc.forward_simulate_trajectory_clipped_inputs(x0,V_initialize)
         self.__feasible = self.mpc.feasible(self.__X_candidate, self.__V_candidate, robust=False)
@@ -90,10 +90,16 @@ class SafeOnlineEvaluationAMPC(AMPC):
         # if not cf:
             # print(f"THIS SHOULD NEVER HAPPEN {self.i}")
 
-        if (self.mpc.feasible(X,V) and cd) or (not cf): # only check for cost decrease if we want to enforce it, if candidate is infeasible, always take NN, we have no guarantees anyways
+        nf = self.mpc.feasible(X,V)
+        nf_state = self.mpc.in_state_and_input_constraints(X, V)
+        nf_terminal = self.mpc.in_terminal_constraints(X[-1,:])
+
+        self.feasible_debug = {"candidate_feasible":cf, "in_state_and_input_constraints":nf_state, "in_terminal_constraint":nf_terminal, "cost_decrease": cd}
+
+        if (nf and cd) or (not cf): # only check for cost decrease if we want to enforce it, if candidate is infeasible, always take NN, we have no guarantees anyways
             self.__V_candidate = copy.deepcopy(V)
             self.__X_candidate = copy.deepcopy(X)
-            self.__feasible = True
+            self.__feasible = nf
             # print("tic")
         else:
             # print("toc")
@@ -168,9 +174,9 @@ def closed_loop_experiment(x0, controller, Nsim=1000):
         V_cl[k,:]         = np.copy(v)
         U_cl[k,:]         = np.copy(u)
         X_cl[k+1,:]       = np.copy(x1_ol)
-        
+
         feasible_ampc[k]  = np.copy(controller.feasible)
-                
+
         feasible_cl = np.copy(controller.mpc.in_state_and_input_constraints(X_cl[:k+2,:], V_cl[:k+1,:], robust=False, verbose=False))
         if not feasible_cl:
             status = 'infeasible_cl'
@@ -198,7 +204,7 @@ def iterate_controllers(x0, V_init, controllers, Nsim=1000):
         results.append({"status":status, "X":X, "U":U, "V":V, "feasible": feasible, "feasible_init": feasible_init})
     return results
 
-def closed_loop_test_on_dataset(dataset, model_name, N_samples=int(1e3)):
+def closed_loop_test_on_dataset(dataset, model_name, N_samples=int(1e3), N_sim=200):
     """performs closed loop simulation on dataset of initial conditions
     
     Args:
@@ -221,9 +227,15 @@ def closed_loop_test_on_dataset(dataset, model_name, N_samples=int(1e3)):
     safe_controller = SafeOnlineEvaluationAMPC(mpc, model)
     safe_controller_ground_trueth_init = SafeOnlineEvaluationAMPCGroundTruethInit(mpc, model)
 
-    controllers = [ naive_controller, safe_controller, safe_controller_ground_trueth_init ]
-    controller_names = [ "naive", "safe", "safe init" ]
+    # controllers = [ naive_controller, safe_controller, safe_controller_ground_trueth_init ]
+    controllers = [ naive_controller, safe_controller_ground_trueth_init ]
+    controller_names = [ "naive", "safe init" ]
     
+    # sample_idx = [104, 112, 131, 154, 242, 484, 514, 667, 738, 835, 866, 976]
+    # N_samples = len(sample_idx)
+    # X_test = X[sample_idx]
+    # V_test = V[sample_idx]
+
     X_test = X[:N_samples]
     V_test = V[:N_samples]
     results = []
@@ -231,18 +243,48 @@ def closed_loop_test_on_dataset(dataset, model_name, N_samples=int(1e3)):
     for i in tqdm(range(N_samples)):
         x0              = X_test[i]
         V_initialize    = V_test[i]
-        simulation_results = iterate_controllers(x0, V_initialize, controllers)
+        simulation_results = iterate_controllers(x0, V_initialize, controllers, Nsim = N_sim)
         results.append(simulation_results)
 
-    for j in range(len(controllers)):
-        mu_cl_feasible = np.mean(np.array([results[i][j]["status"]!="infeasible_cl" for i in range(N_samples)]))
-        status_initially_feasible = [ results[i][j]["status"] for i in range(N_samples) if results[i][j]["feasible"][0] or results[i][j]["feasible_init"] ]
-        mu_cl_feasible_of_initially_feasible = np.mean(status_initially_feasible!="infeasible_cl")
-        print(f"Results for controller: {controller_names[j]}:\n\t {mu_cl_feasible=} \n\t{mu_cl_feasible_of_initially_feasible=}")
+    # l1 = [results[i][0]["status"] for i in range(N_samples)]
+    # l2 = [results[i][1]["status"] for i in range(N_samples)]
+    # l3 = [results[i][1]["feasible"] for i in range(N_samples)]
+    # l4 = [results[i][1]["feasible_init"] for i in range(N_samples)]
+    # print(f"\n\nresults are \n naive: {l1} \n safe init: {l2} \n safe init feasible_init: {l4} \n safe init feasible: {l3}")
 
+    for j in range(len(controllers)):
+        status_cl = np.array([results[i][j]["status"] for i in range(N_samples) if (any(results[i][1]["feasible"]) or results[i][1]["feasible_init"])])
+        status_cl_safe_NN_init = np.array([results[i][j]["status"] for i in range(N_samples) if results[i][j]["feasible"][0]])
+        # print(f"status cl debug = {status_cl}")
+        terminal_set_rached_cl = np.mean(status_cl=="terminal_set_reached")
+        feasible_cl = np.mean(status_cl!="infeasible_cl")
+        feasible_cl_safe_NN_init = np.mean(status_cl_safe_NN_init!="infeasible_cl")
+        print(f"Results for controller: {controller_names[j]}: {terminal_set_rached_cl=}, {feasible_cl=}, {feasible_cl_safe_NN_init=}")
+    # # naive
+    # status_naive = [results[i][j]["status"] for i in range(N_samples) if (results[i][3]["feasible"][0] or results[i][3]["feasible_init"])]
+    # j=0
+
+    # print(f"Results for controller: {controller_names[j]}: {terminal_set_rached_cl=}, {feasible_cl=}")
+
+    # # safe
+    # j=1
+    # status_safe = np.array([results[i][j]["status"] for i in range(N_samples) if (results[i][3]["feasible"][0] or results[i][3]["feasible_init"])])
+    # terminal_set_rached_cl = np.mean(status_safe=="terminal_set_reached")
+    # feasible_cl = np.mean(status_safe!="infeasible")
+    # print(f"Results for controller: {controller_names[j]}: {terminal_set_rached_cl=}, {feasible_cl=}")
+    
+    # # safe init
+    # j=2
+    # status_safe_init = [ results[i][j]["status"]!="infeasible_cl" for i in range(N_samples) if (results[i][j]["feasible"][0] or results[i][j]["feasible_init"]) ]
+    # aprint = [results[i][j]["feasible_init"] for i in range(N_samples)]
+    # print(f"{aprint=}")
+    # print(f"{status_initially_feasible=}")
+    # mu_cl_feasible = np.mean(status_initially_feasible!="infeasible")
+    # print(f"Results for controller: {controller_names[j]}: {mu_cl_feasible=}")
+    
     idx_naive_infeas_safe_feas = [i for i in range(N_samples) if (results[i][0]["status"] == "infeasible_cl" ) and ( results[i][1]["status"] != "infeasible_cl")]
     print(f"{idx_naive_infeas_safe_feas=}")
-
+    return
     return [results[idx] for idx in idx_naive_infeas_safe_feas], controller_names, mpc
 
 def closed_loop_test_wtf(dataset, model_name, N_samples=int(1e3)):
@@ -265,9 +307,9 @@ def closed_loop_test_wtf(dataset, model_name, N_samples=int(1e3)):
         controller.initialize(x0, V_initialize)
         status, X, U, V, feasible = closed_loop_experiment(x0, controller, Nsim=N_samples)
         if ( status == "infeasible_cl" ) and feasible[0]:
-            print(f"{X=},{U=},{V=}")
+            print(f"{X=},{U=},{V=},{feasible=}")
 
-def closed_loop_test_on_sampler(model_name, sampler, N_samples=int(1e3)):
+def closed_loop_test_on_sampler(model_name, sampler, N_samples=int(1e3), N_sim=20):
     """performs closed loop simulation on sampled initial conditions
     
     Args:
@@ -293,11 +335,96 @@ def closed_loop_test_on_sampler(model_name, sampler, N_samples=int(1e3)):
     print(f"\ntesting controllers on {N_samples} initial conditions in closed loop\n")
     for i in tqdm(range(N_samples)):
         x0 = sampler.sample()
-        simulation_results = iterate_controllers(x0, None, controllers)
+        simulation_results = iterate_controllers(x0, None, controllers, Nsim=N_sim)
         results.append(simulation_results)
 
     for j in range(len(controllers)):
-        mu_cl_feasible = np.mean(np.array([results[i][j]["status"]!="infeasible_cl" for i in range(N_samples)]))
-        status_initially_feasible = np.array([ results[i][j]["status"]!="infeasible_cl" for i in range(N_samples) if results[i][j]["feasible_init"] or results[i][j]["feasible"][0]])
-        mu_cl_feasible_of_initially_feasible = np.mean(status_initially_feasible)
-        print(f"Results for controller: {controller_names[j]}:\n\t {mu_cl_feasible=} \n\t{mu_cl_feasible_of_initially_feasible=}")
+        mu_cl_feasible = np.mean(np.array([results[i][j]["status"]=="terminal_set_reached" for i in range(N_samples)]))
+        print(f"Results for controller: {controller_names[j]}: {mu_cl_feasible=}")
+
+
+def closed_loop_test_reason(dataset, model_name, N_samples=int(1e3), N_sim=200):
+    mpc, X, V, _, _ = mpc_dataset_import(dataset)
+    if N_samples >= X.shape[0]:
+        N_samples = X.shape[0]
+        print("WARNING: N_samples exceeds size of dataset, will use N_samples =", N_samples,"instead")
+    # X_test, X_train, Y_test, Y_train = train_test_split(X, U, test_size=0.1, random_state=42)
+    model = import_model(modelname=model_name)
+
+    controller = SafeOnlineEvaluationAMPCGroundTruethInit(mpc, model)
+    X_test = X
+    # X_test = X[:N_samples]
+    V_test = V
+    # V_test = V[:N_samples]
+    results = []
+    print("\ntesting controllers on", len(X_test), "initial conditions in closed loop\n")
+    # j = 0
+    for i in tqdm(range(N_samples)):
+        # feasible_initial_point = False
+        x0              = X_test[i]
+        V_initialize    = V_test[i]
+        controller.initialize(x0, V_initialize)
+        # while( not feasible_initial_point ):
+            # x0              = X_test[j]
+            # V_initialize    = V_test[j]
+            # j=j+1
+            # controller.initialize(x0, V_initialize)
+            # feasible_initial_point = controller.feasible
+
+        V_cl                = np.zeros((N_sim-1, mpc.nu))
+        U_cl                = np.zeros((N_sim-1, mpc.nu))
+        X_cl                = np.zeros((N_sim,   mpc.nx))
+        feasible_ampc       = np.zeros((N_sim-1))
+        status = 'running'
+
+        X_cl[0,:] = x0
+    
+        for k in range(N_sim-1):
+            # print("\nTIMESTEP ",k, "CONTROLLER", i)
+                    # print("\nTIMESTEP ",k, "CONTROLLER", i)
+            x0_ol = X_cl[k,:]
+            v, x1_ol = controller(x0_ol)
+            # x1_ol = controller.mpc.forward_simulate_single_step(x0_ol, v)
+            u = controller.mpc.stabilizing_feedback_controller_clipped_inputs(x0_ol, v)
+            
+            V_cl[k,:]         = np.copy(v)
+            U_cl[k,:]         = np.copy(u)
+            X_cl[k+1,:]       = np.copy(x1_ol)
+
+            results.append(controller.feasible_debug)
+            
+            feasible_cl = np.copy(controller.mpc.in_state_and_input_constraints(X_cl[:k+2,:], V_cl[:k+1,:], robust=False, verbose=False))
+            if not feasible_cl:
+                status = 'infeasible_cl'
+                # print("SOMETHING IS NOT FEASIBLE")
+                # controller.mpc.in_state_and_input_constraints(X_cl[:k+2,:], V_cl[:k+1,:], robust=False, verbose=True)
+                # print(feasible_ampc[:k+1])
+                # print(U_cl[:k,:])
+            
+            terminalset_reached = controller.mpc.in_terminal_constraints(x1_ol, robust=False )
+            if terminalset_reached:
+                status = 'terminal_set_reached'
+            
+            if status != 'running':
+                break
+
+    
+    # self.feasible_debug = {"candidate_feasible":cf, "in_state_and_input_constraints":nf_state, "in_terminal_constraint":nf_terminal, "cost_decrease": cd}
+    N_results = len(results)
+    # print([r for r in results])
+    # rejectionarray = [not (r["in_state_and_input_constraints"] and r["in_terminal_constraint"] and r["cost_decrease"]) for r in results]
+    # print(rejectionarray)
+    rejection_rate = np.mean(np.array([not (r["in_state_and_input_constraints"] and r["in_terminal_constraint"] and r["cost_decrease"]) for r in results]))
+    rejections = [r for r in results if not (r["in_state_and_input_constraints"] and r["in_terminal_constraint"] and r["cost_decrease"])]
+    rejection_from_state_and_input_constraint= np.mean(np.array([not r["in_state_and_input_constraints"] for r in rejections]))
+    rejection_from_terminal_constraint= np.mean(np.array([not r["in_terminal_constraint"] for r in rejections]))
+    rejection_from_cost_decrease= np.mean(np.array([not r["cost_decrease"] for r in rejections]))
+
+    print(f"{rejection_rate=}")
+    print(f"{rejection_from_state_and_input_constraint=}")
+    print(f"{rejection_from_terminal_constraint=}")
+    print(f"{rejection_from_cost_decrease=}")
+
+
+    
+
