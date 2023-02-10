@@ -375,10 +375,10 @@ def parallel_sample_mpc(n_mass=3, instances=16, samplesperinstance=int(1e5), pre
 
     merge_parallel_jobs([parallel_experiments_common_name], new_dataset_name=parallel_experiments_common_name[:-1])
 
-def computetime_test_fwd_sim_chainmass(n_mass, dataset="latest"):
+def export_acados_sim(n_mass=3):
     name = f'chain_mass_{n_mass}'
     model = export_chain_mass_model(n_mass)
-    Tf = float(np.genfromtxt(fp.joinpath('mpc_parameters','Tf.txt'), delimiter=','))
+    Tf = float(np.genfromtxt(fp.joinpath('mpc_parameters',f'Tf_{n_mass}.txt'), delimiter=','))
     N = 10
     sim = AcadosSim()
     sim.model = model
@@ -397,6 +397,11 @@ def computetime_test_fwd_sim_chainmass(n_mass, dataset="latest"):
         for i in range(len(V)):
             X[i+1] = acados_integrator.simulate(x=X[i], u=V[i])
         return X
+    
+    return run
+
+def computetime_test_fwd_sim_chainmass(n_mass, dataset="latest"):
+    run = export_acados_sim(n_mass=n_mass)
     computetime_test_fwd_sim(run, dataset)
 
 def plot_dataset_ol(dataset="latest"):
