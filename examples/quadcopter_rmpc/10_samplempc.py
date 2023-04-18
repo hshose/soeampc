@@ -370,7 +370,8 @@ def sample_mpc(
             #     print(status)
             #     plot_quadcopter_ol(mpc,[Uinit, U], [Xinit, X], labels=['INIT', 'ACADOS'])
 
-            return X,U, status, computetime
+            number_iterations = float(acados_ocp_solver.get_stats('sqp_iter'))
+            return X,U, status, computetime, number_iterations
 
     
     # print("\n\nrun([0, 0, -1, 0,0,0, 0,0,0,0 ])")

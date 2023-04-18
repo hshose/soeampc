@@ -44,7 +44,7 @@ def closed_loop_test_on_sampler_chain_mass(model_name="latest", N_samples=int(1e
         x_min[i*3+1] = -0.1
 
     sampler = RandomSampler(N_samples, nx, random_seed, x_min, x_max)
-    closed_loop_test_on_sampler(model_name, sampler, N_samples, N_sim=20)
+    closed_loop_test_on_sampler(model_name, sampler, N_samples, N_sim=200)
 
 def closed_loop_test_on_dataset_plot(dataset="latest", model_name="latest", N_samples=1000):
     results, controllers, mpc = closed_loop_test_on_dataset(dataset, model_name, N_samples)

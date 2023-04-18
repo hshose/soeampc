@@ -316,7 +316,8 @@ def sample_mpc(
             # print(S)
             computetime = float(acados_ocp_solver.get_stats('time_tot'))
             print(status)
-            return X,U, status, computetime
+            number_iterations = float(acados_ocp_solver.get_stats('sqp_iter'))
+            return X,U, status, computetime, number_iterations
 
     # print(run([-5, -5, -10, 0,0,0, 0,0,0,0 ]))
     # print(run([1, 1, 0, 0,0,0, 0,0,0,0 ]))

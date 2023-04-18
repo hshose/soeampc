@@ -33,6 +33,7 @@ def sample_dataset_from_mpc(mpc, run, sampler, outfile, verbose=False):
     Xdataset =  np.empty((sampler.Nsamples, mpc.N+1, mpc.nx), float)
     Udataset =  np.empty((sampler.Nsamples, mpc.N, mpc.nu), float)
     computetimes = np.empty(sampler.Nsamples, float)
+    sqp_iterations = np.empty(sampler.Nsamples, int)
 
     runtobreak = True
 
@@ -45,7 +46,7 @@ def sample_dataset_from_mpc(mpc, run, sampler, outfile, verbose=False):
     with tqdm(total=sampler.Nsamples) as pbar:
         while n < sampler.Nsamples:
             x0 = sampler.sample()
-            X, U, status, elapsed = run(x0)
+            X, U, status, elapsed, sqp_iteration = run(x0)
             # print(status)
             if status == 0 or status == 2:
                 if verbose:
@@ -55,6 +56,7 @@ def sample_dataset_from_mpc(mpc, run, sampler, outfile, verbose=False):
                     Xdataset[Nvalid,:,:]  = X
                     Udataset[Nvalid,:,:]  = U
                     computetimes[Nvalid] = elapsed
+                    sqp_iterations[Nvalid] = sqp_iteration
                     Nvalid += 1
                     if runtobreak:
                         pbar.update(1)
@@ -70,6 +72,9 @@ def sample_dataset_from_mpc(mpc, run, sampler, outfile, verbose=False):
     print("Got",Nvalid,"feasible solutions for MPC")
     print("MPC compute time statistics:")
     print_compute_time_statistics(computetimes[:Nvalid])
+
+    mean_sqp_iteration_time = np.mean(computetimes[:Nvalid]/sqp_iterations[:Nvalid])
+    print(f"{mean_sqp_iteration_time=}")
 
     datasetname = export_dataset(
         mpc,

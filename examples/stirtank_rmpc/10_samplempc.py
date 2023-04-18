@@ -334,7 +334,8 @@ def sample_mpc(
             # if status == 0 or status == 2:
             #     plot_stirtank_ol(mpc,[U], [X], labels=['INIT'])
 
-            return X,U, status, computetime
+            number_iterations = float(acados_ocp_solver.get_stats('sqp_iter'))
+            return X,U, status, computetime, number_iterations
 
 
     # experimentname = ""

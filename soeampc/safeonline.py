@@ -339,8 +339,9 @@ def closed_loop_test_on_sampler(model_name, sampler, N_samples=int(1e3), N_sim=2
         results.append(simulation_results)
 
     for j in range(len(controllers)):
-        mu_cl_feasible = np.mean(np.array([results[i][j]["status"]=="terminal_set_reached" for i in range(N_samples)]))
-        print(f"Results for controller: {controller_names[j]}: {mu_cl_feasible=}")
+        mu_cl_in_terminal_set = np.mean(np.array([results[i][j]["status"]=="terminal_set_reached" for i in range(N_samples)]))
+        mu_cl_feasible = np.mean(np.array([results[i][j]["status"]!="infeasible_cl" for i in range(N_samples)]))
+        print(f"Results for controller: {controller_names[j]}: {mu_cl_feasible=} {mu_cl_in_terminal_set=}")
 
 
 def closed_loop_test_reason(dataset, model_name, N_samples=int(1e3), N_sim=200):
