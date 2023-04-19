@@ -30,14 +30,14 @@ python samplempc.py parallel_sample_mpc \\
 ```
 The results of this would be saved in a folder called `datasets/chain_mass_{n_mass}_N_{instances*samplesperinstance}_merged_{prefix}_{date}-{time}`
 
-If you downloaded the precomputed dataset for this example, you should find it under `datasets/chain_mass_3_N_19080000_merged_32329395`.
+If you downloaded the precomputed dataset for this example, you should find it under `datasets/chain_mass_3_N_19080000`.
 
 ## Training a NN
 
 If you want to train an approximator on the precomputed dataset for this example, call
 ```
 python3 approximatempc.py find_approximate_mpc
-    --dataset=chain_mass_3_N_19080000_merged_32329395
+    --dataset=chain_mass_3_N_19080000
 ```
 the models will be saved in a `models` folder.
 
@@ -47,7 +47,7 @@ If you downloaded the pretrained NN, you should finde it under `models/9-200-400
 You can run closed loop test with the model calling
 ```
 python3 safeonlineevaluation.py closed_loop_test_on_dataset \\
-    --dataset=chain_mass_3_N_120000_validate \\
+    --dataset=chain_mass_3_N_120000_test \\
     --model_name=9-200-400-600-600-400-200-30_mu=0.09_20230131-021341 \\
     --N_samples=10000 \\
     --N_sim=200

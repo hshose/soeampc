@@ -29,7 +29,7 @@ python samplempc.py parallel_sample_mpc \\
 ```
 The results of this would be saved in a folder called `datasets/quadcopter_N_{instances*samplesperinstance}_merged_{prefix}_{date}-{time}`
 
-If you downloaded the precomputed dataset for this example, you should find it under `datasets/quadcopter_N_9600000_merged_20221223-161206`.
+If you downloaded the precomputed dataset for this example, you should find it under `datasets/quadcopter_N_9600000`.
 
 ## Training a NN
 
@@ -46,7 +46,7 @@ If you downloaded the pretrained NN, you should finde it under `models/10-200-40
 You can run closed loop test with the model calling
 ```
 python3 safeonlineevaluation.py closed_loop_test_on_dataset \\
-    --dataset=quadcopter_N_120000_merged_Cluster_2023_01_06_05_51_PM_31926010_2_20230106-175146 \\
+    --dataset=quadcopter_N_120000_test \\
     --model_name=10-200-400-600-600-400-200-30_mu=0.12_20230104-232806 \\
     --N_samples=3000 \\
     --N_sim=1000
