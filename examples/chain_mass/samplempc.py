@@ -401,10 +401,6 @@ def parallel_sample_mpc(
             number of random initial states per instance
         prefix:
             string added to the output file name
-
-    Returns:
-        model:
-            acados model
     """
     now = get_date_string()
 
