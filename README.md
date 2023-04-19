@@ -14,7 +14,10 @@ pip3 install -r soeampc/requirements.txt
 `
 
 ## Examples
-You find the numerical examples with their own instructions in the `examples` folder.
+You find the numerical examples with their own instructions in the `examples` folder:
+- [Two state stir tank reactor](examples/stirtank/README.md)
+- [Ten state quadcopter](examples/quadcopter/README.md)
+- [Chain mass system](examples/chain_mass/README.md)
 
 ## Downloading precomputed datasets and pretrained NNs
 You can download the training and testing datasets from [here](10.5281/zenodo.7846094).
