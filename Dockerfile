@@ -55,6 +55,7 @@ RUN pip3 install -r /soeampc/examples/requirements.txt
 
 COPY . /soeampc
 WORKDIR /soeampc
+
 # docker build -t soeampc
 
 # docker run -it -v $(pwd):/soeampc 

@@ -9,7 +9,7 @@ The output of the MATLAB file are already available in the folder `mpc_parameter
 matlab -nodisplay -r "run('offlinempcingredients.m')"
 ```
 
-The mpc parameters should be safed in human-readible `.txt` form in the folder `mpc_parameters`.
+The mpc parameters should be saved in human readable `.txt` form in the folder `mpc_parameters`.
 
 ## MPC dataset generation
 To generate samples of the MPC, call
@@ -40,7 +40,7 @@ python3 approximatempc.py find_approximate_mpc \\
 ```
 The models will be saved in a `models` folder.
 
-If you downloaded the pretrained NN, you should finde it under `models/10-200-400-600-600-400-200-30_mu=0.12_20230104-232806`
+If you downloaded the pretrained NN, you should find it under `models/10-200-400-600-600-400-200-30_mu=0.12_20230104-232806`
 
 ## Testing the NN
 You can run closed loop test with the model calling
