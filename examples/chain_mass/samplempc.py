@@ -1,10 +1,6 @@
 from plot import *
 import importlib
 import fire
-from soeampc.datasetutils import import_dataset, merge_parallel_jobs, get_date_string, merge_single_parallel_job, print_dataset_statistics, mpc_dataset_import
-from soeampc.mpcproblem import MPCQuadraticCostLxLu
-from soeampc.samplempc import sample_dataset_from_mpc, computetime_test_fwd_sim
-from soeampc.sampler import RandomSampler
 from pathlib import Path
 import sys
 import os
@@ -20,6 +16,11 @@ np.set_printoptions(edgeitems=3)
 np.core.arrayprint._line_width = 200
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+
+from soeampc.datasetutils import import_dataset, merge_parallel_jobs, get_date_string, merge_single_parallel_job, print_dataset_statistics, mpc_dataset_import
+from soeampc.mpcproblem import MPCQuadraticCostLxLu
+from soeampc.samplempc import sample_dataset_from_mpc, computetime_test_fwd_sim
+from soeampc.sampler import RandomSampler
 
 fp = Path(os.path.dirname(__file__))
 os.chdir(fp)
@@ -418,12 +419,13 @@ def parallel_sample_mpc(
     print("datasetpath = ", datasetpath)
     processes = []
     parallel_experiments_common_name = prefix+"_"+str(now)+"_"
+    p = Path("logs").mkdir(parents=True,exist_ok=True)
     for i in range(instances):
         # command = ["python3", "01_samplempc.py", "--showplot=False", "--randomseed=None", "--experimentname=Docker_"+str(now)+"_"+str(i)+"_", "--numberofsamples="+str(samplesperinstance)]
         experimentname = parallel_experiments_common_name+"_"+str(i)+"_"
         command = [
             "python3",
-            "10_samplempc.py",
+            "samplempc.py",
             "sample_mpc",
             f"--n_mass={n_mass}",
             "--showplot=False",

@@ -1,6 +1,3 @@
-from soeampc.datasetutils import import_dataset, print_dataset_statistics, merge_single_parallel_job
-from soeampc.mpcproblem import *
-from soeampc.trainampc import architecture_search, retrain_model, test_ampc, computetime_test_model
 import fire
 from pathlib import Path
 import numpy as np
@@ -9,6 +6,9 @@ import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
+from soeampc.datasetutils import import_dataset, print_dataset_statistics, merge_single_parallel_job
+from soeampc.mpcproblem import *
+from soeampc.trainampc import architecture_search, retrain_model, test_ampc, computetime_test_model
 
 fp = Path(os.path.dirname(__file__))
 os.chdir(fp)
