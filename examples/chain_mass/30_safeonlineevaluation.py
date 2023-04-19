@@ -16,18 +16,6 @@ from soeampc.sampler import RandomSampler
 
 # from samplempc import export_acados_sim
 
-# def evaluate_on_sampler(dataset="latest", model="latest", N_samples=int(1e3)):
-#     mpc, X, V, _, _ = mpc_dataset_import(dataset)
-#     sampler = ...
-
-#     model = import_model(modelname=model)
-    
-#     naive_controller = AMPC(mpc, model)
-#     safe_controller = SafeOnlineEvaluationAMPC(mpc, model)
-
-#     controllers = [ naive_controller, safe_controller ]
-#     closed_loop_test(sampler, controllers)
-
 def closed_loop_test_on_sampler_chain_mass(model_name="latest", N_samples=int(1e3), random_seed=None):
     """test closed loop on sampled initial conditions
 
