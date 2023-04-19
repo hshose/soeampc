@@ -14,7 +14,7 @@ The mpc parameters should be saved in human readable .txt form in the folder `mp
 ## MPC dataset generation
 To generate samples of the MPC, call
 ```
-python samplempc.py sample_mpc \\
+python3 samplempc.py sample_mpc \\
     --n_mass=3 \\
     --numberofsamples=10
 ```
@@ -23,7 +23,7 @@ The results of this would be saved in a folder called `datasets/chain_mass_{n_ma
 
 You can similarly create a larger dataset, by calling this function in parallel
 ```
-python samplempc.py parallel_sample_mpc \\
+python3 samplempc.py parallel_sample_mpc \\
     --instances=24 \\
     --samplesperinstance=10 \\
     --prefix=Cluster_test

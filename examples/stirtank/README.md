@@ -14,7 +14,7 @@ The MPC parameters should be saved in human readable `.txt` form in the folder `
 ## MPC dataset generation
 To generate samples of the MPC, call
 ```
-python samplempc.py sample_mpc \\
+python3 samplempc.py sample_mpc \\
     --numberofsamples=10
 ```
 The results of this would be saved in a folder called `datasets/stirtank_N_{numberofsamples}_{date}-{time}`.
@@ -22,7 +22,7 @@ The results of this would be saved in a folder called `datasets/stirtank_N_{numb
 
 You can similarly create a larger dataset, by calling this function in parallel
 ```
-python samplempc.py parallel_sample_mpc \\
+python3 samplempc.py parallel_sample_mpc \\
     --instances=24 \\
     --samplesperinstance=10 \\
     --prefix=Cluster_test

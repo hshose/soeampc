@@ -7,6 +7,12 @@ Paper describing the theory can be found [here](https://arxiv.org/abs/)
 You need an acados installation to run parts of this code.
 Please follow [acados installation instructions](https://docs.acados.org/installation/index.html). This code was tested with acados v0.1.9.
 
+Install other Python dependencies via pip:
+`
+pip3 install -r examples/requirements.txt
+pip3 install -r soeampc/requirements.txt
+`
+
 ## Examples
 You find the numerical examples with their own instructions in the `examples` folder.
 
