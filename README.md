@@ -1,7 +1,7 @@
 # Approximate non-linear model predictive control with safety-augmented neural networks
 Implementation of safety-augmentation and three numerical benchmark examples (stirtank reactor, quadcopter, and chain mass system).
 
-Paper describing the theory can be found [here](https://arxiv.org/abs/2304.09575).
+Paper describing the theory can be found [on arXiv](https://arxiv.org/abs/2304.09575).
 
 ## Requirements
 You need an acados installation to run parts of this code.
@@ -20,7 +20,7 @@ You find the numerical examples with their own instructions in the `examples` fo
 - [Chain mass system](examples/chain_mass/README.md)
 
 ## Downloading precomputed datasets and pretrained NNs
-You can download the training and testing datasets from [here](10.5281/zenodo.7846094).
+You can download the training and testing datasets from [Zenodo](https://doi.org/10.5281/zenodo.7846094).
 
 Extract the datasets into the `examples/{system}/datasets/` folder, e.g., for the quadcopter example, you should get an `examples/quadcopter/datasets/quadcopter_N_9600000` folder.
 
