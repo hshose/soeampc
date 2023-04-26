@@ -2,14 +2,14 @@
 Implementation of safety-augmentation and three numerical benchmark examples (stirtank reactor, quadcopter, and chain mass system). The paper describing the theory can be found [on arXiv](https://arxiv.org/abs/2304.09575).
 
 ## Requirements
-You need acados to run parts of this code.
-Please follow [the official acados installation instructions](https://docs.acados.org/installation/index.html). This code was tested with acados v0.1.9.
+You need `acados` to run parts of this code.
+Please follow [the official acados installation instructions](https://docs.acados.org/installation/index.html). This code was tested with `acados v0.1.9`.
 
 You can install other Python dependencies via pip:
-`
+```bash
 pip3 install -r examples/requirements.txt
 pip3 install -r soeampc/requirements.txt
-`
+```
 
 ## Numerical Examples
 You find the numerical examples from the paper in the `examples` folder. Each example has it's own `README.md` file with instructions how to run them:
